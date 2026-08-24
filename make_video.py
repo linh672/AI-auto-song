@@ -69,8 +69,9 @@ NVENC_PRESET = "p2"
 NVENC_TUNE = "hq"       # high-quality tuning mode
 NVENC_CQ = "23"         # constant quality (0=best, 51=worst; ~18-28 is typical)
 
-# AAC audio bitrate for the final output
-AUDIO_BITRATE = "192k"
+# AAC audio quality: VBR mode, 0 = best (~256-320 kbps), 2 = good (~160 kbps).
+# Use -q:a (VBR) instead of -b:a (CBR) for better quality/size ratio.
+AUDIO_QUALITY = "0"
 
 # ---------------------------------------------------------------------------
 # GPU encoder detection
@@ -303,11 +304,16 @@ def _build_video_cmd(
         "ffmpeg",
         "-y",
         "-threads", str(CPU_THREADS),
-        # Loop the video input
+        # Loop the video input; -an strips its original audio so it cannot
+        # interfere with the song audio we supply as a second input.
         "-stream_loop", str(loops_needed),
+        "-an",                       # mute the source video track
         "-i", str(video),
-        # Audio input
+        # Concatenated songs audio (WAV PCM -- lossless, re-encoded to AAC below)
         "-i", str(audio),
+        # Explicit stream mapping: video from input 0, audio from input 1 only.
+        "-map", "0:v:0",
+        "-map", "1:a:0",
         # Trim to exact audio length
         "-t", str(total_seconds),
     ]
@@ -334,8 +340,9 @@ def _build_video_cmd(
         ]
 
     cmd += [
+        # AAC VBR best quality (-q:a 0 ≈ 256-320 kbps)
         "-c:a", "aac",
-        "-b:a", AUDIO_BITRATE,
+        "-q:a", AUDIO_QUALITY,
         "-shortest",
         str(out_path),
     ]
