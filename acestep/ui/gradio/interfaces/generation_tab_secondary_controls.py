@@ -77,6 +77,7 @@ def build_custom_mode_controls() -> dict[str, Any]:
                     with gr.Column(scale=1):
                         captions = gr.Textbox(
                             label=t("generation.caption_label"),
+                            value=t("generation.caption_placeholder"),
                             placeholder=t("generation.caption_placeholder"),
                             lines=12,
                             max_lines=12,
