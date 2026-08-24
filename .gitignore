@@ -3,10 +3,11 @@
 *.mp3
 AlbumArt*.jpg
 Folder.jpg
-
+archive/
 
 data/
 *.mp3
+*.mp4
 *.wav
 *.pkf
 flow_edit_test_outputs/
