@@ -140,6 +140,7 @@ class GenerationDecompositionContractTests(unittest.TestCase):
             ("generation_tab_primary_controls.py", "build_hidden_generation_state"),
             ("generation_tab_simple_controls.py", "build_simple_mode_controls"),
             ("generation_tab_source_controls.py", "build_source_track_and_code_controls"),
+            ("generation_tab_variation_morph_controls.py", "build_variation_morph_controls"),
             ("generation_tab_secondary_controls.py", "build_cover_strength_controls"),
             ("generation_tab_secondary_controls.py", "build_custom_mode_controls"),
             ("generation_tab_secondary_controls.py", "build_repainting_controls"),

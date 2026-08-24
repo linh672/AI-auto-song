@@ -631,7 +631,8 @@ class LLMHandler:
             )
             logger.info(f"Constrained processor initialized in {time.time() - processor_start:.2f} seconds")
 
-            # Disable CUDA/HIP graph capture on ROCm (unverified on RDNA3 Windows),
+            # Disable CUDA/HIP graph capture on Windows (FlashAttention CUDA graph capture
+            # can fail and poison the CUDA stream), ROCm (unverified on RDNA3 Windows),
             # on Jetson (SDPA paged-cache decode calls .item() during capture),
             # and when flash_attn is not installed (same .item() incompatibility on all CUDA hardware).
             # When flash_attn is unavailable, nano-vllm falls back to _sdpa_decode_with_paged_cache
@@ -639,7 +640,13 @@ class LLMHandler:
             # synchronisation that is forbidden inside torch.cuda.CUDAGraph capture,
             # corrupting the CUDA context and causing downstream errors such as:
             #   RuntimeError: Offset increment outside graph capture encountered unexpectedly
+            is_windows = sys.platform == "win32"
             is_rocm = hasattr(torch.version, 'hip') and torch.version.hip is not None
+            if is_windows:
+                logger.info(
+                    "Windows detected: disabling CUDA graph capture for nano-vllm "
+                    "to prevent failed capture from corrupting the CUDA stream"
+                )
             is_jetson = False
             if device == "cuda" and torch.cuda.is_available():
                 try:
@@ -672,7 +679,9 @@ class LLMHandler:
                     "Triton not available: disabling CUDA graph capture for nano-vllm "
                     "(CUDA graphs require torch.compile which depends on Triton)"
                 )
-            enforce_eager_for_vllm = bool(is_rocm or is_jetson or not _has_flash_attn or not _has_triton)
+            enforce_eager_for_vllm = bool(
+                is_windows or is_rocm or is_jetson or not _has_flash_attn or not _has_triton
+            )
 
             # Auto-detect best backend on Apple Silicon
             if backend == "mlx" or (backend == "vllm" and device == "mps"):

@@ -28,6 +28,7 @@ from .training_dataset_preprocess_wiring import (
     register_training_preprocess_handler,
 )
 from .training_run_wiring import register_training_run_handlers
+from .queue_wiring import register_queue_handlers
 
 __all__ = [
     "GenerationWiringContext",
@@ -40,6 +41,7 @@ __all__ = [
     "register_generation_metadata_handlers",
     "register_generation_mode_handlers",
     "register_generation_run_handlers",
+    "register_queue_handlers",
     "register_results_aux_handlers",
     "register_results_restore_and_lrc_handlers",
     "register_results_save_button_handlers",

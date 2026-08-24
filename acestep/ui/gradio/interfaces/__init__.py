@@ -37,7 +37,12 @@ from acestep.ui.gradio.interfaces.user_preferences import (
 )
 from acestep.ui.gradio.interfaces.result import create_results_section
 from acestep.ui.gradio.interfaces.training import create_training_section
-from acestep.ui.gradio.events import setup_event_handlers, setup_training_event_handlers
+from acestep.ui.gradio.interfaces.task_queue_tab import create_task_queue_section
+from acestep.ui.gradio.events import (
+    setup_event_handlers,
+    setup_training_event_handlers,
+    setup_queue_event_handlers,
+)
 from acestep.ui.gradio.help_content import create_help_button, HELP_MODAL_CSS
 
 
@@ -330,7 +335,7 @@ def create_gradio_interface(dit_handler, llm_handler, dataset_handler, init_para
         )
         
         # ═══════════════════════════════════════════
-        # Tabs: Generation | Training
+        # Tabs: Generation | Task Queue | Training
         # ═══════════════════════════════════════════
         with gr.Tabs():
             # --- Generation Tab ---
@@ -344,6 +349,10 @@ def create_gradio_interface(dit_handler, llm_handler, dataset_handler, init_para
                     results_section = create_results_section(dit_handler)
                 # Store the wrapper in gen_section so event handlers can toggle it
                 gen_section["results_wrapper"] = results_wrapper
+
+            # --- Task Queue Tab ---
+            with gr.Tab(t("queue.tab_title")):
+                queue_section = create_task_queue_section()
             
             # --- Training Tab ---
             with gr.Tab(t("training.tab_title"), visible=not service_mode):
@@ -368,6 +377,12 @@ def create_gradio_interface(dit_handler, llm_handler, dataset_handler, init_para
         
         # Connect training event handlers
         setup_training_event_handlers(demo, dit_handler, llm_handler, training_section)
+
+        # Connect queue event handlers
+        setup_queue_event_handlers(
+            demo, dit_handler, llm_handler,
+            generation_section, results_section, queue_section
+        )
 
         # Restore user preferences from browser localStorage on page load.
         # In service mode, skip restore so localStorage cannot override

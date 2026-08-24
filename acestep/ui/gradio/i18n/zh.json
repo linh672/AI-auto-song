@@ -508,5 +508,26 @@
     "latent_shift_info": "VAE 解码前对 DiT latent 施加的偏移量。默认 0（不偏移）。负值（如 -0.04）可减少爆音。",
     "latent_rescale": "Latent 缩放",
     "latent_rescale_info": "VAE 解码前对 DiT latent 施加的缩放因子。默认 1.0（不缩放）。小于 1.0 的值（如 0.91）可减少爆音。"
+  },
+  "queue": {
+    "tab_title": "📋 任务队列",
+    "add_to_queue_btn": "➕ 加入队列",
+    "resume_queue_btn": "▶ 恢复队列",
+    "pause_queue_btn": "⏸ 暂停队列",
+    "clear_completed_btn": "🗑 清理已完成",
+    "refresh_btn": "🔄 刷新",
+    "queue_status_title": "队列状态",
+    "active_task": "当前执行任务",
+    "no_active_task": "无正在执行的任务（队列空闲）",
+    "queue_table_title": "已排队任务",
+    "col_id": "任务ID",
+    "col_title": "标题 / 描述",
+    "col_lora": "LoRA 适配器",
+    "col_status": "状态",
+    "col_created": "创建时间",
+    "select_task": "选择已完成任务以预览音频",
+    "audio_preview": "🎵 任务音频输出",
+    "no_audio": "该任务暂无音频输出",
+    "task_added": "✅ 任务 '{title}' 已加入队列！"
   }
 }

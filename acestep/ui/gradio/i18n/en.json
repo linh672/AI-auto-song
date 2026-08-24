@@ -543,5 +543,26 @@
     "latent_shift_info": "Advanced: Shifts the internal audio representation before decoding. Try small negative values (e.g. -0.04) if your outputs have clipping/distortion. 0 = no shift (default). Only adjust if you're hearing audio artifacts.",
     "latent_rescale": "Latent Rescale",
     "latent_rescale_info": "Advanced: Scales the internal audio representation before decoding. Values below 1.0 (e.g. 0.91) can reduce clipping/distortion. 1.0 = no rescale (default). Only adjust if you're hearing audio artifacts despite normalization."
+  },
+  "queue": {
+    "tab_title": "📋 Task Queue",
+    "add_to_queue_btn": "➕ Add to Queue",
+    "resume_queue_btn": "▶ Resume Queue",
+    "pause_queue_btn": "⏸ Pause Queue",
+    "clear_completed_btn": "🗑 Clear Completed",
+    "refresh_btn": "🔄 Refresh",
+    "queue_status_title": "Queue Status",
+    "active_task": "Active Task",
+    "no_active_task": "No task running (Queue idle)",
+    "queue_table_title": "Queued Tasks",
+    "col_id": "Task ID",
+    "col_title": "Title / Description",
+    "col_lora": "LoRA Adapter",
+    "col_status": "Status",
+    "col_created": "Created At",
+    "select_task": "Select Completed Task to Preview Audio",
+    "audio_preview": "🎵 Task Audio Output",
+    "no_audio": "No audio output for this task",
+    "task_added": "✅ Task '{title}' added to queue!"
   }
 }

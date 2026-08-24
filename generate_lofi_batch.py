@@ -1,5 +1,5 @@
 """
-ACE-Step V1.5 — Batch Music Generation Script
+ACE-Step V1.5 — Batch Music Generation Script with tqdm Progress Tracking
 Generates 5 rounds of 2-batch music tracks (10 tracks total) for a given description.
 """
 
@@ -8,6 +8,7 @@ import sys
 import time
 from pathlib import Path
 from loguru import logger
+from tqdm.auto import tqdm
 
 # Ensure proxy settings do not interfere
 for proxy_var in ["http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"]:
@@ -43,8 +44,61 @@ MUSIC_PROMPT = (
     "nostalgic, smooth, soft, bassline, jazzy, mellow, hip hop, relaxing"
 )
 
-TOTAL_ROUNDS = 5
-BATCH_SIZE = 2
+# Configuration for 8GB VRAM (RTX 4060)
+TOTAL_ROUNDS = 10  # 10 individual generations
+BATCH_SIZE = 1     # Batch size 1 prevents VRAM thrashing / timeout on 8GB GPU
+TARGET_DURATION = 75.0  # Target duration in seconds (~1m15s Lo-fi track)
+
+
+class TqdmProgressTracker:
+    """Handles real-time tqdm progress bars for both overall batches and step-by-step phases."""
+
+    def __init__(self, total_rounds: int, batch_size: int):
+        self.total_rounds = total_rounds
+        self.batch_size = batch_size
+        self.current_round = 0
+        self.overall_bar = tqdm(
+            total=total_rounds * batch_size,
+            desc="🎵 Total Tracks Progress",
+            unit="track",
+            position=0,
+            leave=True,
+        )
+        self.round_bar = None
+
+    def start_round(self, round_idx: int):
+        self.current_round = round_idx
+        if self.round_bar is not None:
+            self.round_bar.close()
+        self.round_bar = tqdm(
+            total=100,
+            desc=f"⏳ Round {round_idx}/{self.total_rounds} [Phase: Initializing]",
+            unit="%",
+            position=1,
+            leave=False,
+        )
+
+    def update_step_progress(self, progress_val, desc: str = ""):
+        if self.round_bar is not None:
+            if isinstance(progress_val, (int, float)):
+                pct = int(min(1.0, max(0.0, float(progress_val))) * 100)
+                self.round_bar.n = pct
+                clean_desc = desc.replace("\n", " ").strip() if desc else "Processing"
+                self.round_bar.set_description(f"⏳ Round {self.current_round}/{self.total_rounds} [{clean_desc[:35]}]")
+                self.round_bar.refresh()
+
+    def finish_round(self, num_tracks_generated: int):
+        if self.round_bar is not None:
+            self.round_bar.n = 100
+            self.round_bar.refresh()
+            self.round_bar.close()
+            self.round_bar = None
+        self.overall_bar.update(num_tracks_generated)
+
+    def close(self):
+        if self.round_bar is not None:
+            self.round_bar.close()
+        self.overall_bar.close()
 
 
 def main():
@@ -93,61 +147,82 @@ def main():
     else:
         logger.info(f"LM model ready in {time.time() - t0:.1f}s")
 
-    # 4. Generation Loop: 5 rounds x 2 batches = 10 tracks
+    # 4. Generation Loop with tqdm Progress Tracking
     logger.info(f"\n{'='*70}")
     logger.info(f"Starting Generation: {TOTAL_ROUNDS} rounds x {BATCH_SIZE} tracks per round (Total: {TOTAL_ROUNDS * BATCH_SIZE} tracks)")
     logger.info(f"Prompt: {MUSIC_PROMPT}")
     logger.info(f"{'='*70}\n")
 
+    progress_tracker = TqdmProgressTracker(total_rounds=TOTAL_ROUNDS, batch_size=BATCH_SIZE)
     all_generated_files = []
     overall_start_time = time.time()
 
-    for round_idx in range(1, TOTAL_ROUNDS + 1):
-        logger.info(f"--- Round {round_idx}/{TOTAL_ROUNDS} (Generating {BATCH_SIZE} tracks) ---")
-        round_start = time.time()
+    try:
+        for round_idx in range(1, TOTAL_ROUNDS + 1):
+            progress_tracker.start_round(round_idx)
+            round_start = time.time()
 
-        params = GenerationParams(
-            task_type="text2music",
-            caption=MUSIC_PROMPT,
-            lyrics="[Instrumental]",
-            instrumental=True,
-            vocal_language="unknown",
-            thinking=llm_handler.llm_initialized,
-            inference_steps=8,
-            guidance_scale=1.0,
-            seed=-1,  # random seed each time
-            enable_normalization=True,
-            normalization_db=-1.0,
-        )
+            params = GenerationParams(
+                task_type="text2music",
+                caption=MUSIC_PROMPT,
+                lyrics="[Instrumental]",
+                instrumental=True,
+                vocal_language="unknown",
+                thinking=llm_handler.llm_initialized,
+                inference_steps=8,
+                guidance_scale=1.0,
+                seed=-1,  # random seed each time
+                enable_normalization=True,
+                normalization_db=-1.0,
+                duration=TARGET_DURATION,  # ~75s — fits in 8GB VRAM without timeout
+            )
 
-        config = GenerationConfig(
-            batch_size=BATCH_SIZE,
-            use_random_seed=True,
-            audio_format="mp3",
-            mp3_bitrate="320k",
-        )
+            config = GenerationConfig(
+                batch_size=BATCH_SIZE,
+                use_random_seed=True,
+                audio_format="mp3",
+                mp3_bitrate="320k",
+            )
 
-        result = generate_music(
-            dit_handler=dit_handler,
-            llm_handler=llm_handler,
-            params=params,
-            config=config,
-            save_dir=OUTPUT_DIR,
-        )
+            try:
+                result = generate_music(
+                    dit_handler=dit_handler,
+                    llm_handler=llm_handler,
+                    params=params,
+                    config=config,
+                    save_dir=OUTPUT_DIR,
+                    progress=progress_tracker.update_step_progress,
+                )
+            except TimeoutError as te:
+                round_elapsed = time.time() - round_start
+                progress_tracker.finish_round(0)
+                tqdm.write(
+                    f"⚠️  Round {round_idx}/{TOTAL_ROUNDS} timed out after {round_elapsed:.0f}s "
+                    f"— skipping and continuing. ({te})"
+                )
+                continue
+            except Exception as e:
+                round_elapsed = time.time() - round_start
+                progress_tracker.finish_round(0)
+                tqdm.write(f"❌ Round {round_idx}/{TOTAL_ROUNDS} error after {round_elapsed:.0f}s: {e} — skipping.")
+                continue
 
-        round_elapsed = time.time() - round_start
+            round_elapsed = time.time() - round_start
+            num_success = len(result.audios) if result.success else 0
+            progress_tracker.finish_round(num_success)
 
-        if result.success:
-            logger.info(f"Round {round_idx}/{TOTAL_ROUNDS} completed in {round_elapsed:.1f}s")
-            for idx, audio in enumerate(result.audios, 1):
-                audio_path = audio.get("path", "(in-memory)")
-                seed = audio.get("params", {}).get("seed", "N/A")
-                logger.info(f"  Track {idx}/{BATCH_SIZE} [Seed: {seed}]: {audio_path}")
-                all_generated_files.append(audio_path)
-        else:
-            logger.error(f"Round {round_idx}/{TOTAL_ROUNDS} failed: {result.status_message}")
+            if result.success:
+                tqdm.write(f"✅ Round {round_idx}/{TOTAL_ROUNDS} completed in {round_elapsed:.1f}s")
+                for idx, audio in enumerate(result.audios, 1):
+                    audio_path = audio.get("path", "(in-memory)")
+                    seed = audio.get("params", {}).get("seed", "N/A")
+                    tqdm.write(f"   ↳ Track {idx}/{BATCH_SIZE} [Seed: {seed}]: {audio_path}")
+                    all_generated_files.append(audio_path)
+            else:
+                tqdm.write(f"❌ Round {round_idx}/{TOTAL_ROUNDS} failed: {result.status_message}")
 
-        logger.info("")
+    finally:
+        progress_tracker.close()
 
     # Summary
     total_elapsed = time.time() - overall_start_time

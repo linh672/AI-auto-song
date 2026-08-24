@@ -20,6 +20,7 @@ from .wiring import (
     register_training_dataset_load_handler,
     register_training_preprocess_handler,
     register_training_run_handlers,
+    register_queue_handlers,
 )
 
 
@@ -130,3 +131,16 @@ def setup_training_event_handlers(demo, dit_handler, llm_handler, training_secti
     # Preprocess dataset to tensor files
     register_training_preprocess_handler(training_context)
     register_training_run_handlers(training_context)
+
+
+def setup_queue_event_handlers(demo, dit_handler, llm_handler, generation_section, results_section, queue_section):
+    """Setup event handlers for the generation task queue tab."""
+    del demo
+    register_queue_handlers(
+        generation_section=generation_section,
+        results_section=results_section,
+        queue_section=queue_section,
+        dit_handler=dit_handler,
+        llm_handler=llm_handler,
+    )
+

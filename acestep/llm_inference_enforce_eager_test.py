@@ -1,10 +1,10 @@
-"""Unit tests for enforce_eager logic when flash_attn is unavailable.
+"""Unit tests for nano-vLLM CUDA graph capture compatibility.
 
 Regression test for the bug where CUDA graph capture would fail when
 ``flash_attn`` is not installed because the SDPA paged-cache decode path
 calls ``.item()`` inside the capture region (a forbidden CPU-GPU sync).
 
-When flash_attn is absent, nano-vllm must run in ``enforce_eager=True``
+Windows and configurations without flash_attn must run in ``enforce_eager=True``
 (eager mode, no CUDA graph capture) to avoid corrupting the CUDA context.
 """
 
@@ -36,13 +36,19 @@ def _mock_gpu_config():
 class TestEnforceEagerWhenFlashAttnMissing(unittest.TestCase):
     """Verify that enforce_eager=True is set when flash_attn is not installed."""
 
-    def _run_initialize_with_mocks(self, flash_attn_available: bool, device_name: str = "NVIDIA GeForce RTX 4090"):
+    def _run_initialize_with_mocks(
+        self,
+        flash_attn_available: bool,
+        device_name: str = "NVIDIA GeForce RTX 4090",
+        platform: str = "linux",
+    ) -> bool:
         """Call handler.initialize() with all heavy operations mocked.
 
         Args:
             flash_attn_available: Whether flash_attn should appear detectable
                 via ``importlib.util.find_spec``.
             device_name: Simulated CUDA device name.
+            platform: Simulated operating-system platform.
 
         Returns:
             The ``enforce_eager`` value that was passed to ``_initialize_5hz_lm_vllm``.
@@ -54,11 +60,16 @@ class TestEnforceEagerWhenFlashAttnMissing(unittest.TestCase):
 
         captured = {}
 
-        def fake_init_vllm(model_path: str, enforce_eager: bool = False) -> str:
+        def fake_init_vllm(
+            model_path: str,
+            enforce_eager: bool = False,
+            has_triton: bool = True,
+        ) -> str:
             captured["enforce_eager"] = enforce_eager
             return "✅ ok"
 
         with patch("importlib.util.find_spec", return_value=find_spec_return), \
+             patch.dict("sys.modules", {"triton": MagicMock()}), \
              patch("os.path.exists", return_value=True), \
              patch("acestep.llm_inference.AutoTokenizer") as mock_tok, \
              patch("acestep.llm_inference.get_global_gpu_config", return_value=_mock_gpu_config()), \
@@ -67,6 +78,7 @@ class TestEnforceEagerWhenFlashAttnMissing(unittest.TestCase):
              patch("torch.cuda.empty_cache"), \
              patch("torch.cuda.synchronize"), \
              patch("torch.cuda.get_device_name", return_value=device_name), \
+             patch("acestep.llm_inference.sys.platform", platform), \
              patch.object(handler, "_initialize_5hz_lm_vllm", side_effect=fake_init_vllm):
 
             mock_tok.from_pretrained.return_value = MagicMock()
@@ -88,12 +100,26 @@ class TestEnforceEagerWhenFlashAttnMissing(unittest.TestCase):
             "CUDA graph capture from corrupting the CUDA context via SDPA .item() calls",
         )
 
-    def test_enforce_eager_false_when_flash_attn_present(self):
-        """enforce_eager must be False when flash_attn is detectable (standard GPU, non-ROCm)."""
-        enforce_eager = self._run_initialize_with_mocks(flash_attn_available=True)
+    def test_enforce_eager_false_on_linux_with_flash_attn_present(self):
+        """Linux CUDA can retain graph capture when required packages are present."""
+        enforce_eager = self._run_initialize_with_mocks(
+            flash_attn_available=True,
+            platform="linux",
+        )
         self.assertFalse(
             enforce_eager,
-            "enforce_eager should be False on standard CUDA hardware with flash_attn present",
+            "enforce_eager should be False on Linux CUDA hardware with flash_attn present",
+        )
+
+    def test_enforce_eager_true_on_windows_with_flash_attn_present(self):
+        """Windows must avoid CUDA graph capture even when flash_attn is installed."""
+        enforce_eager = self._run_initialize_with_mocks(
+            flash_attn_available=True,
+            platform="win32",
+        )
+        self.assertTrue(
+            enforce_eager,
+            "enforce_eager must be True on Windows to prevent failed CUDA graph capture",
         )
 
     def test_enforce_eager_still_true_for_jetson_even_with_flash_attn(self):

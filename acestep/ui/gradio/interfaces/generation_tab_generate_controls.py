@@ -92,7 +92,7 @@ def build_generate_row_controls(
             lm_initialized=lm_initialized,
             service_mode=service_mode,
         )
-        with gr.Column(scale=18):
+        with gr.Column(scale=14):
             generate_btn = gr.Button(
                 t("generation.generate_btn"),
                 variant="primary",
@@ -100,11 +100,20 @@ def build_generate_row_controls(
                 interactive=generate_btn_interactive,
                 elem_id="acestep-generate-btn",
             )
+        with gr.Column(scale=4):
+            add_to_queue_btn = gr.Button(
+                t("queue.add_to_queue_btn"),
+                variant="secondary",
+                size="lg",
+                interactive=True,
+                elem_id="acestep-add-to-queue-btn",
+            )
         autogen_checkbox, auto_lrc = _build_right_generate_toggles(service_mode=service_mode)
     return {
         "think_checkbox": think_checkbox,
         "auto_score": auto_score,
         "generate_btn": generate_btn,
+        "add_to_queue_btn": add_to_queue_btn,
         "generate_btn_row": generate_btn_row,
         "autogen_checkbox": autogen_checkbox,
         "auto_lrc": auto_lrc,
