@@ -32,6 +32,11 @@ from acestep.gpu_config import get_lm_gpu_memory_ratio, get_gpu_memory_gb, get_l
 # basic sanity check — not a hard total-VRAM gate.
 VRAM_SAFE_FREE_GB = 2.0
 
+# The UI defaults to LM chunks of 8 requests. Classifier-free guidance may
+# double this to 16 sequences, so larger nano-vLLM graph pools only consume
+# scarce VRAM without accelerating normal interactive generation.
+NANOVLLM_MAX_NUM_SEQS = 16
+
 
 def _warn_if_prerelease_python():
     v = sys.version_info
@@ -59,6 +64,7 @@ class LLMHandler:
         self.llm_tokenizer = None
         self.llm_initialized = False
         self.llm_backend = None
+        self._cuda_graph_capture_failed = False
         self.max_model_len = 4096
         self.device = "cpu"
         self.dtype = torch.float32
@@ -641,11 +647,19 @@ class LLMHandler:
             # corrupting the CUDA context and causing downstream errors such as:
             #   RuntimeError: Offset increment outside graph capture encountered unexpectedly
             is_windows = sys.platform == "win32"
+            disable_windows_cudagraph = os.environ.get(
+                "ACESTEP_DISABLE_NANOVLLM_CUDAGRAPH", ""
+            ).lower() in ("1", "true", "yes")
             is_rocm = hasattr(torch.version, 'hip') and torch.version.hip is not None
-            if is_windows:
+            if is_windows and disable_windows_cudagraph:
                 logger.info(
-                    "Windows detected: disabling CUDA graph capture for nano-vllm "
-                    "to prevent failed capture from corrupting the CUDA stream"
+                    "Windows CUDA graph capture disabled by "
+                    "ACESTEP_DISABLE_NANOVLLM_CUDAGRAPH"
+                )
+            elif is_windows:
+                logger.info(
+                    "Windows CUDA graph capture enabled by default for nano-vllm with a "
+                    f"{NANOVLLM_MAX_NUM_SEQS}-sequence limit"
                 )
             is_jetson = False
             if device == "cuda" and torch.cuda.is_available():
@@ -680,7 +694,11 @@ class LLMHandler:
                     "(CUDA graphs require torch.compile which depends on Triton)"
                 )
             enforce_eager_for_vllm = bool(
-                is_windows or is_rocm or is_jetson or not _has_flash_attn or not _has_triton
+                (is_windows and disable_windows_cudagraph)
+                or is_rocm
+                or is_jetson
+                or not _has_flash_attn
+                or not _has_triton
             )
 
             # Auto-detect best backend on Apple Silicon
@@ -759,6 +777,8 @@ class LLMHandler:
                     if status_msg.startswith("❌"):
                         logger.warning(f"vLLM initialization failed before PyTorch fallback: {status_msg}")
                         vllm_fallback_note = status_msg.splitlines()[0]
+                        if self._cuda_graph_capture_failed:
+                            return status_msg, False
                         if not self.llm_initialized:
                             if device == "mps" and self._is_mlx_available():
                                 logger.warning("vllm failed on MPS, trying MLX backend...")
@@ -810,6 +830,7 @@ class LLMHandler:
             return "❌ nano-vllm is not installed. Please install it using 'cd acestep/third_parts/nano-vllm && pip install .'"
 
         try:
+            self._cuda_graph_capture_failed = False
             current_device = torch.cuda.current_device()
             device_name = torch.cuda.get_device_name(current_device)
 
@@ -856,6 +877,7 @@ class LLMHandler:
                     model=model_path,
                     enforce_eager=enforce_eager,
                     tensor_parallel_size=1,
+                    max_num_seqs=NANOVLLM_MAX_NUM_SEQS,
                     max_model_len=self.max_model_len,
                     gpu_memory_utilization=gpu_memory_utilization,
                     tokenizer=self.llm_tokenizer,
@@ -870,6 +892,13 @@ class LLMHandler:
                     _dynamo_logger.setLevel(_prev_log_level)
         except Exception as e:
             self.llm_initialized = False
+            if "cuda" in str(e).lower() and "capture" in str(e).lower():
+                self._cuda_graph_capture_failed = True
+                logger.error(
+                    "nano-vLLM CUDA graph capture failed. CUDA cannot safely fall back "
+                    "in this process; restart with ACESTEP_DISABLE_NANOVLLM_CUDAGRAPH=1 "
+                    "to use eager mode."
+                )
             if "Cannot find a working triton installation" in str(e):
                 status_msg = "❌ vLLM backend requires a working Triton installation."
                 if sys.platform == "win32":

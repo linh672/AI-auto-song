@@ -41,6 +41,7 @@ class TestEnforceEagerWhenFlashAttnMissing(unittest.TestCase):
         flash_attn_available: bool,
         device_name: str = "NVIDIA GeForce RTX 4090",
         platform: str = "linux",
+        disable_windows_cudagraph: bool = False,
     ) -> bool:
         """Call handler.initialize() with all heavy operations mocked.
 
@@ -49,6 +50,8 @@ class TestEnforceEagerWhenFlashAttnMissing(unittest.TestCase):
                 via ``importlib.util.find_spec``.
             device_name: Simulated CUDA device name.
             platform: Simulated operating-system platform.
+            disable_windows_cudagraph: Whether to disable Windows CUDA graph
+                capture explicitly.
 
         Returns:
             The ``enforce_eager`` value that was passed to ``_initialize_5hz_lm_vllm``.
@@ -64,12 +67,17 @@ class TestEnforceEagerWhenFlashAttnMissing(unittest.TestCase):
             model_path: str,
             enforce_eager: bool = False,
             has_triton: bool = True,
+            max_num_seqs: int = 512,
         ) -> str:
             captured["enforce_eager"] = enforce_eager
             return "✅ ok"
 
         with patch("importlib.util.find_spec", return_value=find_spec_return), \
              patch.dict("sys.modules", {"triton": MagicMock()}), \
+             patch.dict(
+                 "os.environ",
+                 {"ACESTEP_DISABLE_NANOVLLM_CUDAGRAPH": "1" if disable_windows_cudagraph else ""},
+             ), \
              patch("os.path.exists", return_value=True), \
              patch("acestep.llm_inference.AutoTokenizer") as mock_tok, \
              patch("acestep.llm_inference.get_global_gpu_config", return_value=_mock_gpu_config()), \
@@ -111,16 +119,25 @@ class TestEnforceEagerWhenFlashAttnMissing(unittest.TestCase):
             "enforce_eager should be False on Linux CUDA hardware with flash_attn present",
         )
 
-    def test_enforce_eager_true_on_windows_with_flash_attn_present(self):
-        """Windows must avoid CUDA graph capture even when flash_attn is installed."""
+    def test_enforce_eager_false_on_windows_with_flash_attn_present(self):
+        """Windows uses capped CUDA graph capture when dependencies are available."""
         enforce_eager = self._run_initialize_with_mocks(
             flash_attn_available=True,
             platform="win32",
         )
-        self.assertTrue(
+        self.assertFalse(
             enforce_eager,
-            "enforce_eager must be True on Windows to prevent failed CUDA graph capture",
+            "enforce_eager should be False on Windows when CUDA graph capture is enabled",
         )
+
+    def test_enforce_eager_true_when_windows_cudagraph_is_explicitly_disabled(self):
+        """Windows graph capture can be disabled for a known-incompatible system."""
+        enforce_eager = self._run_initialize_with_mocks(
+            flash_attn_available=True,
+            platform="win32",
+            disable_windows_cudagraph=True,
+        )
+        self.assertTrue(enforce_eager)
 
     def test_enforce_eager_still_true_for_jetson_even_with_flash_attn(self):
         """Jetson GPUs must still use enforce_eager=True even if flash_attn is detectable."""
