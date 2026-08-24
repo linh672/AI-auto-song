@@ -88,7 +88,7 @@ def calculate_score_handler(
             else:
                 pmi_skip_reason = _pmi_vram_skip_reason(llm_handler)
                 if pmi_skip_reason:
-                    pmi_skip_report = f"\n⚠️ PMI Score Skipped: {pmi_skip_reason}"
+                    pmi_skip_report = f"\nWarning: PMI Score Skipped: {pmi_skip_reason}"
                 else:
                     metadata = _build_score_metadata(
                         lm_metadata=lm_metadata,
@@ -109,8 +109,8 @@ def calculate_score_handler(
                         topk=10,
                         score_scale=score_scale,
                     )
-                    if pmi_status and pmi_status.startswith("❌"):
-                        pmi_skip_report = f"\n⚠️ PMI Score Failed: {pmi_status}"
+                    if pmi_status and pmi_status.startswith(("Error:", chr(0x274C))):
+                        pmi_skip_report = f"\nWarning: PMI Score Failed: {pmi_status}"
 
         # DiT alignment scoring
         if has_dit_alignment_data:
@@ -134,15 +134,15 @@ def calculate_score_handler(
                         "\n(Measures how well lyrics timestamps match audio energy using Cross-Attention)"
                     )
                 else:
-                    alignment_report = f"\n⚠️ Alignment Score Failed: {align_result.get('error', 'Unknown error')}"
+                    alignment_report = f"\nWarning: Alignment Score Failed: {align_result.get('error', 'Unknown error')}"
             except Exception as e:
-                alignment_report = f"\n⚠️ Alignment Score Error: {str(e)}"
+                alignment_report = f"\nWarning: Alignment Score Error: {str(e)}"
 
         # Format display string
         if has_audio_codes and llm_handler.llm_initialized:
             if not scores_per_condition:
-                if alignment_report and not alignment_report.startswith("\n⚠️"):
-                    return "📊 DiT Alignment Scores (PMI unavailable):\n" + alignment_report + pmi_skip_report
+                if alignment_report and not alignment_report.startswith("\nWarning:"):
+                    return "DiT Alignment Scores (PMI unavailable):\n" + alignment_report + pmi_skip_report
                 if pmi_skip_report:
                     return pmi_skip_report.strip()
                 return t("messages.score_failed", error="PMI scoring returned no results")
@@ -153,8 +153,8 @@ def calculate_score_handler(
             ]
             conditions_display = "\n".join(condition_lines) if condition_lines else "  (no conditions)"
             final_output = (
-                f"✅ Global Quality Score: {global_score:.4f} (0-1, higher=better)\n\n"
-                f"📊 Per-Condition Scores (0-1):\n{conditions_display}\n"
+                f"Success: Global Quality Score: {global_score:.4f} (0-1, higher=better)\n\n"
+                f"Per-Condition Scores (0-1):\n{conditions_display}\n"
             )
             if alignment_report:
                 final_output += alignment_report + "\n"
@@ -163,11 +163,11 @@ def calculate_score_handler(
             final_output += "Note: Metadata uses Top-k Recall, Caption/Lyrics use PMI"
             return final_output
         else:
-            if alignment_report and not alignment_report.startswith("\n⚠️"):
-                return "📊 DiT Alignment Scores (LM codes not available for Cover/Repaint mode):\n" + alignment_report
+            if alignment_report and not alignment_report.startswith("\nWarning:"):
+                return "DiT Alignment Scores (LM codes not available for Cover/Repaint mode):\n" + alignment_report
             elif alignment_report:
                 return alignment_report
-            return "⚠️ No scoring data available"
+            return "Warning: No scoring data available"
 
     except Exception as e:
         return t("messages.score_error", error=str(e)) + f"\n{traceback.format_exc()}"

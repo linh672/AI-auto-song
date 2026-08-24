@@ -138,11 +138,31 @@ def create_gradio_interface(dit_handler, llm_handler, dataset_handler, init_para
             height: 100% !important;
             min-height: 42px;
         }
-        /* Two-line icon buttons: emoji on top, text below */
+        /* Two-line icon buttons: icon on top, text below */
         .icon-btn-wrap button, .icon-btn-wrap > button {
             word-spacing: 100vw;
             text-align: center;
             line-height: 1.4;
+        }
+        .ui-section-heading {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .ui-section-icon {
+            width: 1.15em;
+            height: 1.15em;
+            color: #6b8cff;
+            flex: 0 0 auto;
+        }
+        /* Give accordion labels a consistent vector control icon. */
+        .accordion .label-wrap::before {
+            content: "";
+            width: 1.05rem;
+            height: 1.05rem;
+            margin-right: 0.5rem;
+            flex: 0 0 auto;
+            background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b8cff' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 7h16M4 17h16M8 3v8M16 13v8'/%3E%3Ccircle cx='8' cy='7' r='2' fill='%23222b45'/%3E%3Ccircle cx='16' cy='17' r='2' fill='%23222b45'/%3E%3C/svg%3E");
         }
 
         /* --- On-hover Tooltips --- */

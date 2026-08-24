@@ -5,6 +5,7 @@ from __future__ import annotations
 import gradio as gr
 
 from acestep.ui.gradio.i18n import t
+from acestep.ui.gradio.interfaces.section_icons import section_heading
 
 
 def build_lokr_dataset_and_adapter_controls() -> dict[str, object]:
@@ -12,7 +13,7 @@ def build_lokr_dataset_and_adapter_controls() -> dict[str, object]:
 
     with gr.Row():
         with gr.Column(scale=2):
-            gr.HTML(f"<h3>📊 {t('training.lokr_section_tensors')}</h3>")
+            gr.HTML(section_heading(t("training.lokr_section_tensors"), "dataset"))
             gr.Markdown(t("training.lokr_tensor_selection_desc"))
 
             lokr_training_tensor_dir = gr.Textbox(
@@ -32,7 +33,7 @@ def build_lokr_dataset_and_adapter_controls() -> dict[str, object]:
             )
 
         with gr.Column(scale=1):
-            gr.HTML(f"<h3>⚙️ {t('training.lokr_section_settings')}</h3>")
+            gr.HTML(section_heading(t("training.lokr_section_settings"), "settings"))
 
             lokr_linear_dim = gr.Slider(
                 minimum=4,

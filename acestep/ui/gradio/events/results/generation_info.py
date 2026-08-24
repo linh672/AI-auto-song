@@ -74,7 +74,7 @@ def _build_generation_info(
 
     if gen_total > 0:
         avg = gen_total / num_audios
-        lines = [f"**🎵 Total generation time {songs_label}: {gen_total:.2f}s**"]
+        lines = [f"**Total generation time {songs_label}: {gen_total:.2f}s**"]
         lines.append(f"- {avg:.2f}s per song")
         if lm_total > 0:
             lines.append(f"- LM phase {songs_label}: {lm_total:.2f}s")
@@ -90,7 +90,7 @@ def _build_generation_info(
 
     if proc_total > 0:
         fmt_label = audio_format.upper() if audio_format != "wav32" else "WAV 32-bit"
-        lines = [f"**🔧 Total processing time {songs_label}: {proc_total:.2f}s**"]
+        lines = [f"**Total processing time {songs_label}: {proc_total:.2f}s**"]
         if audio_conversion_time > 0:
             lines.append(f"- to {fmt_label} {songs_label}: {audio_conversion_time:.2f}s")
         if auto_score_time > 0:

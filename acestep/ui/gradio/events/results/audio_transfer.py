@@ -152,7 +152,7 @@ def convert_result_audio_to_codes(dit_handler, generated_audio):
         return gr.skip(), gr.skip()
     try:
         codes_string = dit_handler.convert_src_audio_to_codes(generated_audio)
-        if not codes_string or codes_string.startswith("❌"):
+        if not codes_string or codes_string.startswith(("Error:", chr(0x274C))):
             gr.Warning(f"Failed to convert audio to codes: {codes_string}")
             return gr.skip(), gr.skip()
         gr.Info("Audio converted to codes successfully.")

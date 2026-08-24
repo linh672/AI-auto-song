@@ -155,7 +155,7 @@ class CalculateScoreHandlerTests(unittest.TestCase):
             patch("torch.cuda.mem_get_info", return_value=(24 * 1024**3, 80 * 1024**3)),
             patch(
                 "acestep.core.scoring.lm_score.calculate_pmi_score_per_condition",
-                return_value=({}, float("-inf"), "❌ Error: CUDA out of memory"),
+                return_value=({}, float("-inf"), f"{chr(0x274C)} Error: CUDA out of memory"),
             ),
         ):
             result = calculate_score_handler(

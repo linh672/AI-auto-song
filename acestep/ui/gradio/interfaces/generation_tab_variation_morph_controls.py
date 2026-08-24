@@ -53,9 +53,9 @@ def build_variation_morph_controls() -> dict[str, Any]:
                             placeholder="empty=random",
                         )
                     retake_think_warning = gr.Markdown(
-                        "⚠️ **Think is on — Retake will mix LM drift with "
+                        "Warning: **Think is on — Retake will mix LM drift with "
                         "noise drift.**  To retake a Think-mode result "
-                        "cleanly: open the result's 📊 Score & LRC & LM "
+                        "cleanly: open the result's Score & LRC & LM "
                         "Codes panel, copy its **LM Codes** into the "
                         "**LM Codes Hints** field above, then uncheck Think "
                         "before adjusting variance.  See the (?) help for "

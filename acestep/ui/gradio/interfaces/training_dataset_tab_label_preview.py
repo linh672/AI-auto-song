@@ -5,12 +5,13 @@ from __future__ import annotations
 import gradio as gr
 
 from acestep.ui.gradio.i18n import t
+from acestep.ui.gradio.interfaces.section_icons import section_heading
 
 
 def build_dataset_label_and_preview_controls() -> dict[str, object]:
     """Render auto-label and sample-preview editors for dataset-builder workflows."""
 
-    gr.HTML(f"<hr><h3>🤖 {t('training.step2_title')}</h3>")
+    gr.HTML(section_heading(t("training.step2_title"), "automation", divider=True))
 
     with gr.Row():
         with gr.Column(scale=3):
@@ -40,7 +41,7 @@ def build_dataset_label_and_preview_controls() -> dict[str, object]:
         lines=2,
     )
 
-    gr.HTML(f"<hr><h3>👀 {t('training.step3_title')}</h3>")
+    gr.HTML(section_heading(t("training.step3_title"), "preview", divider=True))
 
     with gr.Row():
         with gr.Column(scale=1):

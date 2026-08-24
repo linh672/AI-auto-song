@@ -42,7 +42,7 @@ def load_existing_dataset_for_preprocess(
     if not dataset_path or not dataset_path.strip():
         updates = (gr.update(), gr.update(), gr.update(), gr.update(), gr.update())
         return (
-            "❌ Please enter a dataset path",
+            "Error: Please enter a dataset path",
             [],
             _safe_slider(0, value=0, visible=False),
             builder_state,
@@ -53,7 +53,7 @@ def load_existing_dataset_for_preprocess(
     except ValueError:
         updates = (gr.update(), gr.update(), gr.update(), gr.update(), gr.update())
         return (
-            f"❌ Rejected unsafe dataset path: {dataset_path}",
+            f"Error: Rejected unsafe dataset path: {dataset_path}",
             [],
             _safe_slider(0, value=0, visible=False),
             builder_state,
@@ -64,7 +64,7 @@ def load_existing_dataset_for_preprocess(
     if not os.path.exists(dataset_path):
         updates = (gr.update(), gr.update(), gr.update(), gr.update(), gr.update())
         return (
-            f"❌ Dataset not found: {dataset_path}",
+            f"Error: Dataset not found: {dataset_path}",
             [],
             _safe_slider(0, value=0, visible=False),
             builder_state,
@@ -89,12 +89,12 @@ def load_existing_dataset_for_preprocess(
     slider_max = max(0, len(samples) - 1)
 
     labeled_count = builder.get_labeled_count()
-    info = f"📂 Loaded dataset: {builder.metadata.name}\n"
-    info += f"🔢 Samples: {len(samples)} ({labeled_count} labeled)\n"
-    info += f"🏷️ Custom Tag: {builder.metadata.custom_tag or '(none)'}\n"
-    info += "✅ Ready for preprocessing! You can also edit samples below."
+    info = f"Loaded dataset: {builder.metadata.name}\n"
+    info += f"Samples: {len(samples)} ({labeled_count} labeled)\n"
+    info += f"Custom Tag: {builder.metadata.custom_tag or '(none)'}\n"
+    info += "Success: Ready for preprocessing! You can also edit samples below."
     if any((s.formatted_lyrics and not s.lyrics) for s in builder.samples):
-        info += "\nℹ️ Showing formatted lyrics where lyrics are empty."
+        info += "\nInfo: Showing formatted lyrics where lyrics are empty."
 
     first_sample = builder.samples[0]
     has_raw = first_sample.has_raw_lyrics()
@@ -156,20 +156,20 @@ def preprocess_dataset(
         Status message.
     """
     if builder_state is None:
-        return "❌ No dataset loaded. Please scan a directory first."
+        return "Error: No dataset loaded. Please scan a directory first."
 
     if not builder_state.samples:
-        return "❌ No samples in dataset."
+        return "Error: No samples in dataset."
 
     labeled_count = builder_state.get_labeled_count()
     if labeled_count == 0:
-        return "❌ No labeled samples. Please auto-label or manually label samples first."
+        return "Error: No labeled samples. Please auto-label or manually label samples first."
 
     if not output_dir or not output_dir.strip():
-        return "❌ Please enter an output directory."
+        return "Error: Please enter an output directory."
 
     if dit_handler is None or dit_handler.model is None:
-        return "❌ Model not initialized. Please initialize the service first."
+        return "Error: Model not initialized. Please initialize the service first."
 
     def progress_callback(msg):
         if progress:
@@ -201,18 +201,18 @@ def load_training_dataset(tensor_dir: str) -> str:
         Info text about the dataset.
     """
     if not tensor_dir or not tensor_dir.strip():
-        return "❌ Please enter a tensor directory path"
+        return "Error: Please enter a tensor directory path"
 
     try:
         tensor_dir = safe_path(tensor_dir.strip())
     except ValueError:
-        return f"❌ Rejected unsafe tensor directory path: {tensor_dir}"
+        return f"Error: Rejected unsafe tensor directory path: {tensor_dir}"
 
     if not os.path.exists(tensor_dir):
-        return f"❌ Directory not found: {tensor_dir}"
+        return f"Error: Directory not found: {tensor_dir}"
 
     if not os.path.isdir(tensor_dir):
-        return f"❌ Not a directory: {tensor_dir}"
+        return f"Error: Not a directory: {tensor_dir}"
 
     manifest_path = os.path.join(tensor_dir, "manifest.json")
     if os.path.exists(manifest_path):
@@ -225,9 +225,9 @@ def load_training_dataset(tensor_dir: str) -> str:
             name = metadata.get("name", "Unknown")
             custom_tag = metadata.get("custom_tag", "")
 
-            info = f"📂 Loaded preprocessed dataset: {name}\n"
-            info += f"🔢 Samples: {num_samples} preprocessed tensors\n"
-            info += f"🏷️ Custom Tag: {custom_tag or '(none)'}"
+            info = f"Loaded preprocessed dataset: {name}\n"
+            info += f"Samples: {num_samples} preprocessed tensors\n"
+            info += f"Custom Tag: {custom_tag or '(none)'}"
 
             return info
         except Exception as e:
@@ -236,9 +236,9 @@ def load_training_dataset(tensor_dir: str) -> str:
     pt_files = [f for f in os.listdir(tensor_dir) if f.endswith(".pt")]
 
     if not pt_files:
-        return f"❌ No .pt tensor files found in {tensor_dir}"
+        return f"Error: No .pt tensor files found in {tensor_dir}"
 
-    info = f"📂 Found {len(pt_files)} tensor files in {tensor_dir}\n"
-    info += "ℹ️ No manifest.json found - using all .pt files"
+    info = f"Found {len(pt_files)} tensor files in {tensor_dir}\n"
+    info += "Info: No manifest.json found - using all .pt files"
 
     return info

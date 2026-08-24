@@ -5,12 +5,13 @@ from __future__ import annotations
 import gradio as gr
 
 from acestep.ui.gradio.i18n import t
+from acestep.ui.gradio.interfaces.section_icons import section_heading
 
 
 def build_lokr_run_and_export_controls() -> dict[str, object]:
     """Render LoKr training-run and export controls for the training tab."""
 
-    gr.HTML(f"<hr><h3>🎛️ {t('training.train_section_params')}</h3>")
+    gr.HTML(section_heading(t("training.train_section_params"), "settings", divider=True))
 
     with gr.Row():
         lokr_learning_rate = gr.Number(
@@ -113,7 +114,7 @@ def build_lokr_run_and_export_controls() -> dict[str, object]:
             scale=1,
         )
 
-    gr.HTML(f"<hr><h3>📦 {t('training.lokr_export_header')}</h3>")
+    gr.HTML(section_heading(t("training.lokr_export_header"), "export", divider=True))
 
     with gr.Row():
         lokr_export_path = gr.Textbox(

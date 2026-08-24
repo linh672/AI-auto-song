@@ -5,6 +5,7 @@ from __future__ import annotations
 import gradio as gr
 
 from acestep.ui.gradio.i18n import t
+from acestep.ui.gradio.interfaces.section_icons import section_heading
 
 
 def build_dataset_scan_and_settings_controls() -> dict[str, object]:
@@ -21,7 +22,7 @@ def build_dataset_scan_and_settings_controls() -> dict[str, object]:
 
     with gr.Row():
         with gr.Column(scale=1):
-            gr.HTML("<h4>📂 Load Existing Dataset</h4>")
+            gr.HTML(section_heading("Load Existing Dataset", "upload", level=4))
             with gr.Row():
                 load_json_path = gr.Textbox(
                     label=t("training.load_dataset_label"),
@@ -37,7 +38,7 @@ def build_dataset_scan_and_settings_controls() -> dict[str, object]:
             )
 
         with gr.Column(scale=1):
-            gr.HTML("<h4>🔍 Scan New Directory</h4>")
+            gr.HTML(section_heading("Scan New Directory", "dataset", level=4))
             with gr.Row():
                 audio_directory = gr.Textbox(
                     label=t("training.scan_label"),
@@ -65,7 +66,7 @@ def build_dataset_scan_and_settings_controls() -> dict[str, object]:
             )
 
         with gr.Column(scale=1):
-            gr.HTML(f"<h3>⚙️ {t('training.dataset_settings_header')}</h3>")
+            gr.HTML(section_heading(t("training.dataset_settings_header"), "settings"))
 
             dataset_name = gr.Textbox(
                 label=t("training.dataset_name"),

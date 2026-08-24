@@ -5,6 +5,7 @@ from __future__ import annotations
 import gradio as gr
 
 from acestep.ui.gradio.i18n import t
+from acestep.ui.gradio.interfaces.section_icons import section_heading
 
 
 def build_lora_run_and_export_controls(
@@ -15,7 +16,7 @@ def build_lora_run_and_export_controls(
 ) -> dict[str, object]:
     """Render LoRA training-run and export controls for the training tab."""
 
-    gr.HTML(f"<hr><h3>🎛️ {t('training.train_section_params')}</h3>")
+    gr.HTML(section_heading(t("training.train_section_params"), "settings", divider=True))
 
     with gr.Row():
         learning_rate = gr.Number(
@@ -130,7 +131,7 @@ def build_lora_run_and_export_controls(
             scale=1,
         )
 
-    gr.HTML(f"<hr><h3>📦 {t('training.export_header')}</h3>")
+    gr.HTML(section_heading(t("training.export_header"), "export", divider=True))
 
     with gr.Row():
         export_path = gr.Textbox(

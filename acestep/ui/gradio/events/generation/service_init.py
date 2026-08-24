@@ -92,7 +92,7 @@ def init_service_wrapper(
     if init_llm:
         if not gpu_config.available_lm_models:
             logger.warning(
-                f"⚠️ GPU tier {gpu_config.tier} ({gpu_config.gpu_memory_gb:.1f}GB) does not support LM on GPU. "
+                f"Warning: GPU tier {gpu_config.tier} ({gpu_config.gpu_memory_gb:.1f}GB) does not support LM on GPU. "
                 "Falling back to CPU for LM initialization."
             )
             lm_device = "cpu"
@@ -102,7 +102,7 @@ def init_service_wrapper(
     if init_llm and lm_model_path and gpu_config.available_lm_models:
         if not is_lm_model_size_allowed(lm_model_path, gpu_config.available_lm_models):
             logger.warning(
-                f"⚠️ LM model {lm_model_path} is not in the recommended list for tier {gpu_config.tier} "
+                f"Warning: LM model {lm_model_path} is not in the recommended list for tier {gpu_config.tier} "
                 f"(recommended: {gpu_config.available_lm_models}). Proceeding with user selection — "
                 f"this may cause high VRAM usage or OOM."
             )
@@ -111,7 +111,7 @@ def init_service_wrapper(
     if init_llm and resolved_backend != backend:
         backend = resolved_backend
         logger.warning(
-            f"⚠️ Requested LM backend is not supported for tier {gpu_config.tier} "
+            f"Warning: Requested LM backend is not supported for tier {gpu_config.tier} "
             f"on this hardware, falling back to {backend}"
         )
 
@@ -207,7 +207,7 @@ def init_service_wrapper(
         elem_classes=["has-info-container"],
     )
 
-    status += f"\n📊 GPU Config: tier={gpu_config.tier}, max_duration={max_duration}s, max_batch={max_batch}"
+    status += f"\nGPU Config: tier={gpu_config.tier}, max_duration={max_duration}s, max_batch={max_batch}"
     if gpu_config.available_lm_models:
         status += f", available_lm={gpu_config.available_lm_models}"
     else:
@@ -243,7 +243,7 @@ def on_tier_change(selected_tier, llm_handler=None):
 
     new_config = get_gpu_config_for_tier(selected_tier)
     set_global_gpu_config(new_config)
-    logger.info(f"🔄 Tier manually changed to {selected_tier} — updating UI defaults")
+    logger.info(f"Working: Tier manually changed to {selected_tier} — updating UI defaults")
 
     if new_config.lm_backend_restriction == "pt_only":
         available_backends = ["pt"]
@@ -266,7 +266,7 @@ def on_tier_change(selected_tier, llm_handler=None):
     from acestep.gpu_config import get_gpu_device_name
     _gpu_device_name = get_gpu_device_name()
     gpu_info_text = (
-        f"🖥️ **{_gpu_device_name}** — {new_config.gpu_memory_gb:.1f} GB VRAM "
+        f"**{_gpu_device_name}** — {new_config.gpu_memory_gb:.1f} GB VRAM "
         f"— {t('service.gpu_auto_tier')}: **{tier_label}**"
     )
 

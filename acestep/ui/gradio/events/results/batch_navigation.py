@@ -123,7 +123,7 @@ def navigate_to_next_batch(autogen_enabled, current_batch_index, total_batches, 
 
     next_batch_status_text = ""
     if autogen_enabled and new_idx == total_batches - 1:
-        next_batch_status_text = "🔄 AutoGen will generate next batch in background..."
+        next_batch_status_text = "Working: AutoGen will generate next batch in background..."
 
     stored_scores = batch_data.get("scores", [""] * 8) or [""] * 8
     stored_lrcs = batch_data.get("lrcs", [""] * 8) or [""] * 8

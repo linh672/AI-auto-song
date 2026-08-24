@@ -40,7 +40,7 @@ def create_training_section(dit_handler, llm_handler, init_params=None) -> dict:
     gr.HTML(
         """
     <div style="text-align: center; padding: 10px; margin-bottom: 15px;">
-        <h2>🎵 LoRA Training for ACE-Step</h2>
+        <h2>LoRA Training for ACE-Step</h2>
         <p>Build datasets from your audio files and train custom LoRA adapters</p>
     </div>
     """

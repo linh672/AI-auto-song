@@ -84,19 +84,19 @@ class TestSaveDataset(unittest.TestCase):
 
     def test_none_builder(self):
         status, _ = save_dataset("path.json", "name", None)
-        self.assertIn("❌", status)
+        self.assertIn("Error:", status)
 
     def test_empty_samples(self):
         builder = MagicMock()
         builder.samples = []
         status, _ = save_dataset("path.json", "name", builder)
-        self.assertIn("❌", status)
+        self.assertIn("Error:", status)
 
     def test_empty_path(self):
         builder = MagicMock()
         builder.samples = [MagicMock()]
         status, _ = save_dataset("", "name", builder)
-        self.assertIn("❌", status)
+        self.assertIn("Error:", status)
 
 
 if __name__ == "__main__":

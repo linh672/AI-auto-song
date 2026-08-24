@@ -6,6 +6,8 @@ import ast
 import unittest
 from pathlib import Path
 
+from acestep.ui.gradio.interfaces.section_icons import section_heading
+
 try:
     from .training_contract_ast_utils import (
         call_name,
@@ -24,6 +26,21 @@ except ImportError:
 
 class TrainingDecompositionContractTests(unittest.TestCase):
     """Verify the training interface facade composes focused helper modules."""
+
+    def test_section_heading_renders_an_accessible_svg_icon(self) -> None:
+        """Section headings should render escaped text with the requested SVG icon."""
+
+        heading = section_heading('Export <LoRA>', "export", level=4, divider=True)
+
+        self.assertIn("<hr><h4", heading)
+        self.assertIn('class="ui-section-icon"', heading)
+        self.assertIn("Export &lt;LoRA&gt;", heading)
+
+    def test_section_heading_rejects_an_invalid_level(self) -> None:
+        """Section headings should reject invalid HTML heading levels."""
+
+        with self.assertRaises(ValueError):
+            section_heading("Settings", "settings", level=7)
 
     def test_training_facade_imports_tab_helpers(self) -> None:
         """``training.py`` should import dataset, LoRA, and LoKr helper modules."""
@@ -105,18 +122,17 @@ class TrainingDecompositionContractTests(unittest.TestCase):
             f"Missing training_section keys: {sorted(required_keys - produced_keys)}",
         )
 
-    def test_training_ui_markers_preserved(self) -> None:
-        """Key emoji UI markers should remain present after decomposition."""
+    def test_training_section_icons_are_used(self) -> None:
+        """Training sections should use the shared SVG-heading helper."""
 
         interfaces_dir = Path(__file__).resolve().parent
         expected_markers = {
-            "training.py": ["🎵 LoRA Training for ACE-Step"],
-            "training_dataset_tab_scan_settings.py": ["📂 Load Existing Dataset", "🔍 Scan New Directory"],
-            "training_dataset_tab_label_preview.py": ["🤖", "👀"],
-            "training_dataset_tab_save_preprocess.py": ["💾", "⚡"],
-            "training_lora_tab_dataset.py": ["📊", "⚙️"],
-            "training_lora_tab_run_export.py": ["🎛️", "📦"],
-            "training_lokr_tab_run_export.py": ["🎛️", "📦"],
+            "training_dataset_tab_scan_settings.py": ["section_heading", "upload", "dataset"],
+            "training_dataset_tab_label_preview.py": ["section_heading", "automation", "preview"],
+            "training_dataset_tab_save_preprocess.py": ["section_heading", "export", "workflow"],
+            "training_lora_tab_dataset.py": ["section_heading", "dataset", "settings"],
+            "training_lora_tab_run_export.py": ["section_heading", "settings", "export"],
+            "training_lokr_tab_run_export.py": ["section_heading", "settings", "export"],
         }
         for module_name, markers in expected_markers.items():
             source = (interfaces_dir / module_name).read_text(encoding="utf-8")

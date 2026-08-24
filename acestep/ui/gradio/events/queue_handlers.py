@@ -147,7 +147,7 @@ def select_task_handler(selected_task_id: str | None) -> tuple[Any, str]:
         f"- **Seed**: `{task.params.get('seed') or 'Random'}`\n"
     )
     if task.error_message:
-        details += f"\n> ❌ **Error**: {task.error_message}\n"
+        details += f"\n> Error: **Error**: {task.error_message}\n"
     elif task.generation_info:
         details += f"\n{task.generation_info}\n"
 

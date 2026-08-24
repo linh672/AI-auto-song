@@ -44,20 +44,20 @@ def start_lokr_training(
     (status, log_text, plot_figure, training_state) tuples.
     """
     if not tensor_dir or not tensor_dir.strip():
-        yield "❌ Please enter a tensor directory path", "", None, training_state
+        yield "Error: Please enter a tensor directory path", "", None, training_state
         return
 
     try:
         tensor_dir = safe_path(tensor_dir.strip())
     except ValueError:
-        yield f"❌ Rejected unsafe tensor directory path: {tensor_dir}", "", None, training_state
+        yield f"Error: Rejected unsafe tensor directory path: {tensor_dir}", "", None, training_state
         return
     if not os.path.isdir(tensor_dir):
-        yield f"❌ Tensor directory not found: {tensor_dir}", "", None, training_state
+        yield f"Error: Tensor directory not found: {tensor_dir}", "", None, training_state
         return
 
     if dit_handler is None or dit_handler.model is None:
-        yield "❌ Model not initialized. Please initialize the service first.", "", None, training_state
+        yield "Error: Model not initialized. Please initialize the service first.", "", None, training_state
         return
 
     if getattr(dit_handler, "quantization", None) is not None:
@@ -65,12 +65,12 @@ def start_lokr_training(
         if hasattr(dit_handler, "switch_to_training_preset"):
             switch_status, switched = dit_handler.switch_to_training_preset()
             if not switched:
-                yield f"❌ {switch_status}", "", None, training_state
+                yield f"Error: {switch_status}", "", None, training_state
                 return
-            yield f"✅ {switch_status}", "", None, training_state
+            yield f"Success: {switch_status}", "", None, training_state
         else:
             yield (
-                "❌ Training requires non-quantized DiT, and auto-switch is unavailable in this build.",
+                "Error: Training requires non-quantized DiT, and auto-switch is unavailable in this build.",
                 "", None, training_state,
             )
             return
@@ -79,7 +79,7 @@ def start_lokr_training(
         from lightning.fabric import Fabric  # noqa: F401
     except ImportError as e:
         yield (
-            f"❌ Missing required packages: {e}\nPlease install: pip install lightning lycoris-lora",
+            f"Error: Missing required packages: {e}\nPlease install: pip install lightning lycoris-lora",
             "", None, training_state,
         )
         return
@@ -132,7 +132,7 @@ def start_lokr_training(
         loss_list: list = []
         initial_plot = _training_loss_figure(training_state, step_list, loss_list)
         start_time = time.time()
-        yield f"🚀 Starting LoKr training from {tensor_dir}...", "", initial_plot, training_state
+        yield f"Starting: Starting LoKr training from {tensor_dir}...", "", initial_plot, training_state
 
         trainer = LoKRTrainer(
             dit_handler=dit_handler, lokr_config=lokr_config, training_config=training_config,
@@ -145,7 +145,7 @@ def start_lokr_training(
             status_text = str(status)
             status_lower = status_text.lower()
             if (
-                status_text.startswith("❌")
+                status_text.startswith(("Error:", chr(0x274C)))
                 or "training failed" in status_lower
                 or "error:" in status_lower
                 or "module not found" in status_lower
@@ -154,7 +154,7 @@ def start_lokr_training(
                 failure_message = status_text
 
             elapsed_seconds = time.time() - start_time
-            time_info = f"⏱️ Elapsed: {_format_duration(elapsed_seconds)}"
+            time_info = f"Elapsed: {_format_duration(elapsed_seconds)}"
             match = re.search(r"Epoch\s+(\d+)/(\d+)", status_text)
             if match:
                 current_ep, total_ep = int(match.group(1)), int(match.group(2))
@@ -176,8 +176,8 @@ def start_lokr_training(
             yield display_status, log_text, plot_figure, training_state
 
             if training_state.get("should_stop", False):
-                log_lines.append("ℹ️ Training stopped by user")
-                yield f"ℹ️ Stopped ({time_info})", "\n".join(log_lines[-15:]), plot_figure, training_state
+                log_lines.append("Info: Training stopped by user")
+                yield f"Info: Stopped ({time_info})", "\n".join(log_lines[-15:]), plot_figure, training_state
                 break
 
         total_time = time.time() - start_time
@@ -189,14 +189,14 @@ def start_lokr_training(
             yield final_msg, "\n".join(log_lines[-15:]), final_plot, training_state
             return
 
-        completion_msg = f"✅ LoKr training completed! Total time: {_format_duration(total_time)}"
+        completion_msg = f"Success: LoKr training completed! Total time: {_format_duration(total_time)}"
         log_lines.append(completion_msg)
         yield completion_msg, "\n".join(log_lines[-15:]), final_plot, training_state
 
     except Exception as e:
         logger.exception("LoKr training error")
         training_state["is_training"] = False
-        yield f"❌ Error: {str(e)}", str(e), _training_loss_figure({}, [], []), training_state
+        yield f"Error: Error: {str(e)}", str(e), _training_loss_figure({}, [], []), training_state
 
 
 def list_lokr_export_epochs(lokr_output_dir: str) -> Tuple[Any, str]:
@@ -217,7 +217,7 @@ def list_lokr_export_epochs(lokr_output_dir: str) -> Tuple[Any, str]:
     except ValueError:
         return (
             gr.update(choices=[default_choice], value=default_choice),
-            "❌ Rejected unsafe output directory path",
+            "Error: Rejected unsafe output directory path",
         )
 
     checkpoint_dir = os.path.join(lokr_output_dir, "checkpoints")
@@ -271,7 +271,7 @@ def export_lokr(
         lokr_output_dir = safe_path(lokr_output_dir)
         export_path = safe_path(export_path.strip())
     except ValueError:
-        return "❌ Rejected unsafe path"
+        return "Error: Rejected unsafe path"
 
     final_dir = os.path.join(lokr_output_dir, "final")
     checkpoint_dir = os.path.join(lokr_output_dir, "checkpoints")

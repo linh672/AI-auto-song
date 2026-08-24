@@ -15,7 +15,7 @@ def create_task_queue_section() -> dict[str, Any]:
     gr.HTML(
         """
         <div style="text-align: center; padding: 10px; margin-bottom: 15px;">
-            <h2>📋 Generation Task Queue</h2>
+            <h2>Generation Task Queue</h2>
             <p>Queue generation tasks with specific LoRAs and process them sequentially in the background</p>
         </div>
         """

@@ -302,8 +302,8 @@ def generate_lrc_handler(dit_handler, sample_idx, current_batch_index, batch_que
             return gr.update(value=lrc_text, visible=True), gr.skip(), batch_queue
         else:
             error_msg = result.get("error", "Unknown error")
-            return gr.update(value=f"❌ {error_msg}", visible=True), gr.skip(), batch_queue
+            return gr.update(value=f"Error: {error_msg}", visible=True), gr.skip(), batch_queue
 
     except Exception as e:
         logger.exception("[generate_lrc_handler] Error generating LRC")
-        return gr.update(value=f"❌ Error: {str(e)}", visible=True), gr.skip(), batch_queue
+        return gr.update(value=f"Error: Error: {str(e)}", visible=True), gr.skip(), batch_queue

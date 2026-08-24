@@ -17,11 +17,11 @@ class TestLoadTrainingDataset(unittest.TestCase):
 
     def test_empty_path(self):
         result = load_training_dataset("")
-        self.assertIn("❌", result)
+        self.assertIn("Error:", result)
 
     def test_nonexistent_path(self):
         result = load_training_dataset("/nonexistent/path/xyz")
-        self.assertIn("❌", result)
+        self.assertIn("Error:", result)
 
     def test_with_manifest(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -51,7 +51,7 @@ class TestLoadTrainingDataset(unittest.TestCase):
     def test_no_pt_files(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             result = load_training_dataset(tmpdir)
-            self.assertIn("❌", result)
+            self.assertIn("Error:", result)
 
 
 class TestPreprocessDataset(unittest.TestCase):
@@ -59,34 +59,34 @@ class TestPreprocessDataset(unittest.TestCase):
 
     def test_none_builder(self):
         result = preprocess_dataset("/out", "lora", MagicMock(), None)
-        self.assertIn("❌", result)
+        self.assertIn("Error:", result)
 
     def test_empty_samples(self):
         builder = MagicMock()
         builder.samples = []
         result = preprocess_dataset("/out", "lora", MagicMock(), builder)
-        self.assertIn("❌", result)
+        self.assertIn("Error:", result)
 
     def test_no_labeled_samples(self):
         builder = MagicMock()
         builder.samples = [MagicMock()]
         builder.get_labeled_count.return_value = 0
         result = preprocess_dataset("/out", "lora", MagicMock(), builder)
-        self.assertIn("❌", result)
+        self.assertIn("Error:", result)
 
     def test_empty_output_dir(self):
         builder = MagicMock()
         builder.samples = [MagicMock()]
         builder.get_labeled_count.return_value = 5
         result = preprocess_dataset("", "lora", MagicMock(), builder)
-        self.assertIn("❌", result)
+        self.assertIn("Error:", result)
 
     def test_no_model(self):
         builder = MagicMock()
         builder.samples = [MagicMock()]
         builder.get_labeled_count.return_value = 5
         result = preprocess_dataset("/out", "lora", None, builder)
-        self.assertIn("❌", result)
+        self.assertIn("Error:", result)
 
 
 if __name__ == "__main__":

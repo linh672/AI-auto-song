@@ -7,7 +7,7 @@ import gradio as gr
 
 def create_dataset_section(dataset_handler) -> dict:
     """Create dataset explorer section"""
-    with gr.Accordion("📊 Dataset Explorer", open=False, visible=False):
+    with gr.Accordion("Dataset Explorer", open=False, visible=False):
         with gr.Row(equal_height=True):
             dataset_type = gr.Dropdown(
                 choices=["train", "test"],
@@ -16,7 +16,7 @@ def create_dataset_section(dataset_handler) -> dict:
                 info="Choose dataset to explore", elem_classes=["has-info-container"],
                 scale=2
             )
-            import_dataset_btn = gr.Button("📥 Import Dataset", variant="primary", scale=1)
+            import_dataset_btn = gr.Button("Import Dataset", variant="primary", scale=1)
             
             search_type = gr.Dropdown(
                 choices=["keys", "idx", "random"],
@@ -33,7 +33,7 @@ def create_dataset_section(dataset_handler) -> dict:
             )
 
         instruction_display = gr.Textbox(
-            label="📝 Instruction",
+            label="Instruction",
             interactive=False,
             placeholder="No instruction available",
             lines=1
@@ -41,7 +41,7 @@ def create_dataset_section(dataset_handler) -> dict:
         
         repaint_viz_plot = gr.Plot()
         
-        with gr.Accordion("📋 Item Metadata (JSON)", open=False):
+        with gr.Accordion("Item Metadata (JSON)", open=False):
             item_info_json = gr.Code(
                 label="Complete Item Information",
                 language="json",
@@ -56,7 +56,7 @@ def create_dataset_section(dataset_handler) -> dict:
                 interactive=False,
                 scale=8
             )
-            get_item_btn = gr.Button("🔍 Get Item", variant="secondary", interactive=False, scale=2)
+            get_item_btn = gr.Button("Get Item", variant="secondary", interactive=False, scale=2)
         
         with gr.Row(equal_height=True):
             item_target_audio = gr.Audio(
@@ -79,8 +79,8 @@ def create_dataset_section(dataset_handler) -> dict:
                 info="Check to use the source audio from dataset"
             )
 
-        data_status = gr.Textbox(label="📊 Data Status", interactive=False, value="❌ No dataset imported")
-        auto_fill_btn = gr.Button("📋 Auto-fill Generation Form", variant="primary")
+        data_status = gr.Textbox(label="Data Status", interactive=False, value="No dataset imported")
+        auto_fill_btn = gr.Button("Auto-fill Generation Form", variant="primary")
     
     return {
         "dataset_type": dataset_type,

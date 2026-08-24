@@ -27,7 +27,7 @@ def scan_directory(
         Tuple of (table_data, status, slider_update, builder_state).
     """
     if not audio_dir or not audio_dir.strip():
-        return [], "❌ Please enter a directory path", _safe_slider(0, value=0, visible=False), builder_state
+        return [], "Error: Please enter a directory path", _safe_slider(0, value=0, visible=False), builder_state
 
     builder = builder_state if builder_state else DatasetBuilder()
 
@@ -77,22 +77,22 @@ def auto_label_all(
         Tuple of (table_data, status, builder_state).
     """
     if builder_state is None:
-        return [], "❌ Please scan a directory first", builder_state
+        return [], "Error: Please scan a directory first", builder_state
 
     if not builder_state.samples:
-        return [], "❌ No samples to label. Please scan a directory first.", builder_state
+        return [], "Error: No samples to label. Please scan a directory first.", builder_state
 
     if dit_handler is None or dit_handler.model is None:
         return (
             builder_state.get_samples_dataframe_data(),
-            "❌ Model not initialized. Please initialize the service first.",
+            "Error: Model not initialized. Please initialize the service first.",
             builder_state,
         )
 
     if llm_handler is None or not llm_handler.llm_initialized:
         return (
             builder_state.get_samples_dataframe_data(),
-            "❌ LLM not initialized. Please initialize the service with LLM enabled.",
+            "Error: LLM not initialized. Please initialize the service with LLM enabled.",
             builder_state,
         )
 
@@ -189,7 +189,7 @@ def save_sample_edit(
         Tuple of (table_data, status, builder_state).
     """
     if builder_state is None:
-        return [], "❌ No dataset loaded", builder_state
+        return [], "Error: No dataset loaded", builder_state
 
     idx = int(sample_idx)
 
@@ -256,13 +256,13 @@ def save_dataset(
         Tuple of (status, save_path_update).
     """
     if builder_state is None:
-        return "❌ No dataset to save. Please scan a directory first.", gr.update()
+        return "Error: No dataset to save. Please scan a directory first.", gr.update()
 
     if not builder_state.samples:
-        return "❌ No samples in dataset.", gr.update()
+        return "Error: No samples in dataset.", gr.update()
 
     if not save_path or not save_path.strip():
-        return "❌ Please enter a save path.", gr.update()
+        return "Error: Please enter a save path.", gr.update()
 
     save_path = save_path.strip()
     if not save_path.lower().endswith(".json"):
@@ -271,7 +271,7 @@ def save_dataset(
     labeled_count = builder_state.get_labeled_count()
     if labeled_count == 0:
         return (
-            "⚠️ Warning: No samples have been labeled. Consider auto-labeling first.\nSaving anyway...",
+            "Warning: Warning: No samples have been labeled. Consider auto-labeling first.\nSaving anyway...",
             gr.update(value=save_path),
         )
 
