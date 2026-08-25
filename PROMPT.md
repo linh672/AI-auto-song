@@ -1,7 +1,7 @@
 A high quality, soft pastel watercolor anime style animation, inspired by aesthetics, featuring a cute black cat with big eyes sitting peacefully by a tranquil river. An open notebook and a red pencil lie next to it on the ground. The entire scene is static, with floating water lilies and lily pads on the water appearing perfectly stationary. A consistent pattern of gentle rain falling forms a repeating visual background, creating a soothing lofi vibe. The cat looks out at the river with a thoughtful expression. Its eyes, starting fully open, execute one subtle, flawless cycle of blinking—closing gently and then reopening fully to the original position—in a seamless, invisible loop. The only visible motion in the entire scene is this perfectly repeating cyclical eye-blink, which completes one loop and returns the visual state exactly to the beginning without any visible glitch, pop, or jump. No elements of the cat's pose or the environment shift, and the lighting is constant and soft. The focus is on the flawless repetition of the blink against an entirely stable frame.
 
 
-change the cat in the first picture into the dog in the second picture aesthetic don't change anything else
+change the cat in the first picture into the dog in the second pictureaesthetic don't change anything else
 
 
 give me prompt to animate this picture
@@ -15,4 +15,4 @@ Lo-fi hip hop and chillhop with laid-back swung drums, mellow piano loops, soft 
 
 conda activate video_creation
 python -m acestep.acestep_v15_pipeline
-python make_vidieo.py 
+python make_video.py 
