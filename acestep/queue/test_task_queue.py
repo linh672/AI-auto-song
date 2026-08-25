@@ -77,6 +77,10 @@ class TestTaskQueueManager(unittest.TestCase):
 
     def test_pause_and_resume(self):
         self.assertFalse(self.manager.is_paused())
+        self.manager.pause()
+        self.assertTrue(self.manager.is_paused())
+        self.manager.resume()
+        self.assertFalse(self.manager.is_paused())
 
     @patch("acestep.ui.gradio.events.queue_handlers.get_task_queue_manager")
     def test_select_task_returns_all_audio_outputs(self, mock_queue_manager):
@@ -94,10 +98,6 @@ class TestTaskQueueManager(unittest.TestCase):
         self.assertEqual(len(updates), 17)
         self.assertEqual(updates[8:10], ("/outputs/first.mp3", "/outputs/second.mp3"))
         self.assertIn("Preview Track", updates[-1])
-        self.manager.pause()
-        self.assertTrue(self.manager.is_paused())
-        self.manager.resume()
-        self.assertFalse(self.manager.is_paused())
 
 
 class TestTaskWorker(unittest.TestCase):
@@ -142,6 +142,20 @@ class TestTaskWorker(unittest.TestCase):
         self.assertEqual(task.status, "completed")
         self.assertEqual(task.output_audio_paths, ["/path/audio.mp3"])
         self.assertEqual(task.progress, 1.0)
+
+    @patch("acestep.ui.gradio.events.results.generation_progress.generate_with_progress")
+    def test_execute_task_marks_generation_error_as_failed(self, mock_gen):
+        """Generation errors do not appear as successful zero-audio tasks."""
+        mock_gen.return_value = [
+            (None,) * 8 + (None, "generation info", "❌ VAE decoder failed", None)
+        ]
+        task = GenerationTask(id="failed1", title="Failed Track", params={})
+
+        execute_task(task, MagicMock(), MagicMock())
+
+        self.assertEqual(task.status, "failed")
+        self.assertEqual(task.output_audio_paths, [])
+        self.assertEqual(task.error_message, "❌ VAE decoder failed")
 
 
 if __name__ == "__main__":

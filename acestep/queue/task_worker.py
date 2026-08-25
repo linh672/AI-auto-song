@@ -136,8 +136,17 @@ def execute_task(
             raise RuntimeError("Generation did not produce any result")
 
         all_paths = final_result[8] if len(final_result) > 8 else []
-        task.output_audio_paths = [p for p in (all_paths or []) if isinstance(p, str) and not p.endswith(".json")]
+        task.output_audio_paths = [
+            path
+            for path in (all_paths or [])
+            if isinstance(path, str) and not path.endswith(".json")
+        ]
         task.generation_info = str(final_result[9]) if len(final_result) > 9 else ""
+        generation_status = str(final_result[10]) if len(final_result) > 10 else ""
+        if not task.output_audio_paths:
+            error_detail = generation_status or "Generation completed without producing audio."
+            raise RuntimeError(error_detail)
+
         task.status = "completed"
         task.progress = 1.0
         task.status_message = "Generation complete!"
