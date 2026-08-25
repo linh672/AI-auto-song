@@ -4,10 +4,11 @@
 Workflow
 --------
 1. Scan ``gradio_outputs/`` recursively for every ``*.mp3`` file.
-2. Probe all MP3 durations in parallel (ThreadPoolExecutor).
-3. Concatenate them (in folder-name order) into a single draft audio track.
-4. Loop-extend the first ``*.mp4`` found in ``input/`` to match that duration.
-5. Merge the looped video with the concatenated audio and write the result to
+2. Probe all MP3 durations and input video resolution in parallel.
+3. Upscale the input video in ``input/`` to 1080p if below 1080p.
+4. Concatenate MP3s (in folder-name order) into a single draft audio track.
+5. Loop-extend the 1080p video to match that duration.
+6. Merge the looped video with the concatenated audio and write the result to
    ``output/<timestamp>_final.mp4``.
 
 Hardware targets
@@ -27,6 +28,7 @@ To unlock GPU encoding, update your NVIDIA driver:
 Optimisations applied
 ----------------------
 - Parallel ffprobe calls (ThreadPoolExecutor, up to CPU_THREADS workers).
+- Upscale the short input video once before looping to save massive compute.
 - Loop + merge in a single ffmpeg pass (no intermediate looped video file).
 - NVENC pre-check via ``nvidia-smi`` driver version before attempting encode.
 - ``-threads`` tuned for i9-14HX P-core count.
@@ -284,6 +286,118 @@ def _concat_audio(
     return duration
 
 
+def _probe_resolution(path: Path) -> tuple[int, int]:
+    """Return the (width, height) of the primary video stream in *path*.
+
+    Args:
+        path: Path to video file.
+
+    Returns:
+        Tuple of (width, height).
+
+    Raises:
+        RuntimeError: If ffprobe fails or output cannot be parsed.
+    """
+    cmd = [
+        "ffprobe",
+        "-v", "error",
+        "-select_streams", "v:0",
+        "-show_entries", "stream=width,height",
+        "-of", "csv=s=x:p=0",
+        str(path),
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"ffprobe resolution failed for {path}:\n{result.stderr.strip()}")
+    try:
+        parts = result.stdout.strip().split("x")
+        return int(parts[0]), int(parts[1])
+    except Exception as exc:
+        raise RuntimeError(f"Could not parse resolution from {path}: {result.stdout.strip()}") from exc
+
+
+def _upscale_video_to_1080p(
+    video_path: Path,
+    out_path: Path,
+    encoder: str,
+    duration: float,
+) -> Path:
+    """Upscale video to 1080p if its resolution is below 1080p.
+
+    If the video is already 1080p (or higher), returns *video_path* unchanged.
+    Otherwise, scales the video to 1080p (1920x1080 for landscape, 1080x1920 for portrait)
+    using high-quality Lanczos resampling and aspect ratio preservation, saving to *out_path*.
+
+    Args:
+        video_path: Source input video file.
+        out_path: Destination path for upscaled video if upscaling is needed.
+        encoder: Video encoder to use ('h264_nvenc' or 'libx264').
+        duration: Video duration in seconds (for progress bar).
+
+    Returns:
+        Path to the 1080p video (either *video_path* if already >= 1080p, or *out_path*).
+    """
+    width, height = _probe_resolution(video_path)
+    is_portrait = height > width
+    target_w, target_h = (1080, 1920) if is_portrait else (1920, 1080)
+
+    if width >= target_w and height >= target_h:
+        print(f"      Source video is already {width}x{height} (>= 1080p) -- skipping upscale.")
+        return video_path
+
+    print(f"      Upscaling video: {width}x{height} -> {target_w}x{target_h} (1080p)...")
+
+    vf = (
+        f"scale={target_w}:{target_h}:force_original_aspect_ratio=decrease:flags=lanczos,"
+        f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1"
+    )
+
+    is_nvenc = "nvenc" in encoder
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-threads", str(CPU_THREADS),
+        "-i", str(video_path),
+        "-vf", vf,
+    ]
+
+    if is_nvenc:
+        cmd += [
+            "-c:v", encoder,
+            "-preset", NVENC_PRESET,
+            "-tune", NVENC_TUNE,
+            "-cq", "19",
+            "-rc", "vbr",
+            "-b:v", "0",
+            "-gpu", "0",
+        ]
+    else:
+        cmd += [
+            "-c:v", "libx264",
+            "-preset", "slow",
+            "-crf", "18",
+            "-threads", str(CPU_THREADS),
+        ]
+
+    cmd += [
+        "-an",
+        str(out_path),
+    ]
+
+    if duration > 0:
+        _run_ffmpeg_with_progress(
+            cmd,
+            total_seconds=duration,
+            desc=f"      Upscaling ({encoder})",
+        )
+    else:
+        _run_ffmpeg(cmd, "Video upscale")
+
+    new_w, new_h = _probe_resolution(out_path)
+    print(f"      Upscale complete: {new_w}x{new_h}")
+    return out_path
+
+
 def _find_input_video(input_dir: Path) -> Path:
     """Return the first MP4 found in *input_dir* (alphabetical order).
 
@@ -507,7 +621,8 @@ def _run_ffmpeg(cmd: list[str], step_name: str) -> None:
 
 
 def main() -> None:
-    """Orchestrate parallel probe, audio concat, GPU loop+merge into a final video."""
+    """Orchestrate parallel probe, upscale input video to 1080p, audio concat, GPU loop+merge into a final video."""
+    start_total_time = time.perf_counter()
     print("=" * 60)
     print("  ACE-Step - Draft Audio -> Video Builder  [GPU-optimised]")
     print("=" * 60)
@@ -531,8 +646,8 @@ def main() -> None:
             print("  GPU encoder : not detected -- using libx264 ultrafast")
         print("  CPU encoder : libx264 ultrafast (16 threads, i9-14HX)")
 
-    # 1. Collect MP3s
-    print(f"\n[1/3] Scanning for MP3 files in:\n      {GRADIO_OUTPUTS_DIR}")
+    # 1. Collect MP3s & probe files
+    print(f"\n[1/4] Scanning for MP3 files in:\n      {GRADIO_OUTPUTS_DIR}")
     mp3_files = _collect_mp3s(GRADIO_OUTPUTS_DIR)
 
     # Probe input video and all MP3s in PARALLEL
@@ -554,28 +669,41 @@ def main() -> None:
     loops_needed = max(0, int(total_mp3_duration / video_duration))
     plays = loops_needed + 1
 
-    # 2. Concatenate audio
+    encoder = gpu_encoder or "libx264"
     timestamp = int(time.time())
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
+        upscaled_video = tmp_path / f"upscaled_1080p_{input_video.name}"
         concat_wav = tmp_path / "concat_audio.wav"
 
-        print(f"\n[2/3] Concatenating {len(mp3_files)} audio file(s) ({_format_seconds(total_mp3_duration)} total)...")
+        # 2. Upscale input video to 1080p if needed
+        print("\n[2/4] Upscaling input video to 1080p (if needed)...")
+        t_up = time.perf_counter()
+        ready_video = _upscale_video_to_1080p(
+            video_path=input_video,
+            out_path=upscaled_video,
+            encoder=encoder,
+            duration=video_duration,
+        )
+        if ready_video != input_video:
+            print(f"      Upscaling finished in {time.perf_counter() - t_up:.1f}s")
+
+        # 3. Concatenate audio
+        print(f"\n[3/4] Concatenating {len(mp3_files)} audio file(s) ({_format_seconds(total_mp3_duration)} total)...")
         t1 = time.perf_counter()
         total_duration = _concat_audio(mp3_files, concat_wav, expected_duration=total_mp3_duration)
         print(f"      Done in {time.perf_counter() - t1:.1f}s")
 
-        # 3. Loop video + merge audio in ONE ffmpeg pass (no intermediate file)
+        # 4. Loop video + merge audio in ONE ffmpeg pass (no intermediate file)
         final_output = OUTPUT_DIR / f"{timestamp}_final.mp4"
-        encoder = gpu_encoder or "libx264"
-        print(f"\n[3/3] Loop video ({_format_seconds(video_duration)} x~{plays}) + merge audio -> {encoder} encode")
-        print(f"      Source video : {input_video.name}")
+        print(f"\n[4/4] Loop video ({_format_seconds(video_duration)} x~{plays}) + merge audio -> {encoder} encode")
+        print(f"      Source video : {ready_video.name}")
         print(f"      Encoder      : {encoder}")
         print(f"      Output       : {final_output.name}")
 
         t2 = time.perf_counter()
         cmd = _build_video_cmd(
-            video=input_video,
+            video=ready_video,
             audio=concat_wav,
             out_path=final_output,
             total_seconds=total_duration,
@@ -593,7 +721,11 @@ def main() -> None:
         print(f"      Encoded in {encode_secs:.1f}s")
 
     size_mb = final_output.stat().st_size / 1_048_576
-    print(f"\n[OK] Done!  ({size_mb:.1f} MB)\n    {final_output}")
+    total_elapsed = time.perf_counter() - start_total_time
+    print(
+        f"\n[OK] Done in {_format_seconds(total_elapsed)} ({total_elapsed:.1f}s)!  "
+        f"({size_mb:.1f} MB)\n    {final_output}"
+    )
     print("=" * 60)
 
 
@@ -603,3 +735,4 @@ if __name__ == "__main__":
     except (FileNotFoundError, RuntimeError) as exc:
         print(f"\n[ERROR] {exc}", file=sys.stderr)
         sys.exit(1)
+
