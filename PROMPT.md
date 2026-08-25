@@ -1,6 +1,13 @@
 A high quality, soft pastel watercolor anime style animation, inspired by aesthetics, featuring a cute black cat with big eyes sitting peacefully by a tranquil river. An open notebook and a red pencil lie next to it on the ground. The entire scene is static, with floating water lilies and lily pads on the water appearing perfectly stationary. A consistent pattern of gentle rain falling forms a repeating visual background, creating a soothing lofi vibe. The cat looks out at the river with a thoughtful expression. Its eyes, starting fully open, execute one subtle, flawless cycle of blinking—closing gently and then reopening fully to the original position—in a seamless, invisible loop. The only visible motion in the entire scene is this perfectly repeating cyclical eye-blink, which completes one loop and returns the visual state exactly to the beginning without any visible glitch, pop, or jump. No elements of the cat's pose or the environment shift, and the lighting is constant and soft. The focus is on the flawless repetition of the blink against an entirely stable frame.
 
 
+change the cat in the first picture into the dog in the second picture aesthetic don't change anything else
+
+
+give me prompt to animate this picture
+
+
+
 A perfectly seamless, endless loop animation based on the input image. The warm light filtering through the pond subtly pulses and undulates. Delicate steam continuously rises and swirls slowly from the white mug. The surface of the lavender-colored water gently ripples, causing the lily pads to drift imperceptibly. The wide eyes of the black puppy follow a slow, gentle circular path. High quality, smooth animation, atmospheric lofi aesthetic
 
 Lo-fi hip hop and chillhop with laid-back swung drums, mellow piano loops, soft jazzy chord stabs, a round bassline, and subtle head-nod bounce; intro opens with vinyl crackle and felt-piano fragments, verses keep it sparse with dusty hats and warm bass, middle section adds brushed percussion and filtered chord movement, then the outro melts into tape wobble and reversed piano tails, Intimate close-mic texture, cozy and nostalgic, soft-edged and warmly compressed, nostalgic, smooth, soft, bassline, jazzy, mellow, hip hop, relaxing
