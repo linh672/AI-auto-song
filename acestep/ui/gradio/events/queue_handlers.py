@@ -127,17 +127,22 @@ def clear_completed_handler() -> tuple[str, list[list[str]], dict[str, Any], str
     return refresh_queue_ui_handler()
 
 
-def select_task_handler(selected_task_id: str | None) -> tuple[Any, str]:
-    """Load audio and details for selected task."""
+def _build_task_audio_updates(audio_paths: list[str]) -> tuple[Any, ...]:
+    """Return visibility and value updates for the queue's eight audio players."""
+    visible_updates = tuple(gr.update(visible=index < len(audio_paths)) for index in range(8))
+    audio_values = tuple(audio_paths[index] if index < len(audio_paths) else None for index in range(8))
+    return (*visible_updates, *audio_values)
+
+
+def select_task_handler(selected_task_id: str | None) -> tuple[Any, ...]:
+    """Load every generated audio file and the details for a selected task."""
     if not selected_task_id:
-        return None, f"*{t('queue.no_audio')}*"
+        return (*_build_task_audio_updates([]), f"*{t('queue.no_audio')}*")
 
     qm = get_task_queue_manager()
     task = qm.get_task(selected_task_id)
     if not task:
-        return None, f"*{t('queue.no_audio')}*"
-
-    audio_path = task.output_audio_paths[0] if task.output_audio_paths else None
+        return (*_build_task_audio_updates([]), f"*{t('queue.no_audio')}*")
     
     details = (
         f"### Task `{task.id}`: {task.title}\n"
@@ -151,4 +156,4 @@ def select_task_handler(selected_task_id: str | None) -> tuple[Any, str]:
     elif task.generation_info:
         details += f"\n{task.generation_info}\n"
 
-    return audio_path, details
+    return (*_build_task_audio_updates(task.output_audio_paths[:8]), details)

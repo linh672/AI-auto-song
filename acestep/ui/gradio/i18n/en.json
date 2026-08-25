@@ -555,6 +555,7 @@
     "active_task": "Active Task",
     "no_active_task": "No task running (Queue idle)",
     "queue_table_title": "Queued Tasks",
+    "col_index": "#",
     "col_id": "Task ID",
     "col_title": "Title / Description",
     "col_lora": "LoRA Adapter",
@@ -562,6 +563,7 @@
     "col_created": "Created At",
     "select_task": "Select Completed Task to Preview Audio",
     "audio_preview": "Task Audio Output",
+    "audio_output": "Task Audio {n}",
     "no_audio": "No audio output for this task",
     "task_added": "Task '{title}' added to queue!"
   }

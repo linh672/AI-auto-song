@@ -520,6 +520,7 @@
     "active_task": "当前执行任务",
     "no_active_task": "无正在执行的任务（队列空闲）",
     "queue_table_title": "已排队任务",
+    "col_index": "#",
     "col_id": "任务ID",
     "col_title": "标题 / 描述",
     "col_lora": "LoRA 适配器",
@@ -527,6 +528,7 @@
     "col_created": "创建时间",
     "select_task": "选择已完成任务以预览音频",
     "audio_preview": "任务音频输出",
+    "audio_output": "任务音频 {n}",
     "no_audio": "该任务暂无音频输出",
     "task_added": "任务 '{title}' 已加入队列！"
   }

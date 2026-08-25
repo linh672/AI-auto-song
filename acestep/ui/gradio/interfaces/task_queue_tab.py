@@ -48,36 +48,41 @@ def create_task_queue_section() -> dict[str, Any]:
     with gr.Row():
         queue_table = gr.Dataframe(
             headers=[
+                t("queue.col_index"),
                 t("queue.col_id"),
                 t("queue.col_title"),
                 t("queue.col_lora"),
                 t("queue.col_status"),
                 t("queue.col_created"),
             ],
-            datatype=["str", "str", "str", "str", "str"],
+            datatype=["str", "str", "str", "str", "str", "str"],
             value=[],
             interactive=False,
             elem_id="task-queue-table",
         )
 
     with gr.Accordion(t("queue.audio_preview"), open=True):
-        with gr.Row():
-            with gr.Column(scale=2):
-                task_select_dropdown = gr.Dropdown(
-                    label=t("queue.select_task"),
-                    choices=[],
-                    value=None,
-                    interactive=True,
-                )
-                task_audio_preview = gr.Audio(
-                    label=t("queue.audio_preview"),
-                    type="filepath",
-                    interactive=False,
-                )
-            with gr.Column(scale=3):
-                task_details_markdown = gr.Markdown(
-                    value=f"*{t('queue.no_audio')}*"
-                )
+        task_select_dropdown = gr.Dropdown(
+            label=t("queue.select_task"),
+            choices=[],
+            value=None,
+            interactive=True,
+        )
+        task_audio_columns = []
+        task_audio_previews = []
+        for row_start in range(0, 8, 4):
+            with gr.Row():
+                for index in range(row_start + 1, row_start + 5):
+                    with gr.Column(visible=False) as audio_column:
+                        audio_preview = gr.Audio(
+                            label=t("queue.audio_output", n=index),
+                            type="filepath",
+                            interactive=False,
+                            buttons=[],
+                        )
+                    task_audio_columns.append(audio_column)
+                    task_audio_previews.append(audio_preview)
+        task_details_markdown = gr.Markdown(value=f"*{t('queue.no_audio')}*")
 
     return {
         "queue_status_box": queue_status_box,
@@ -86,6 +91,7 @@ def create_task_queue_section() -> dict[str, Any]:
         "refresh_queue_btn": refresh_queue_btn,
         "queue_table": queue_table,
         "task_select_dropdown": task_select_dropdown,
-        "task_audio_preview": task_audio_preview,
+        "task_audio_columns": task_audio_columns,
+        "task_audio_previews": task_audio_previews,
         "task_details_markdown": task_details_markdown,
     }

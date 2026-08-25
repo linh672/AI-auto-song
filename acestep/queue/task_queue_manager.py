@@ -118,7 +118,10 @@ class TaskQueueManager:
     def get_table_rows(self) -> list[list[str]]:
         """Return rows for UI dataframe display."""
         with self._lock:
-            return [t.to_row() for t in self._tasks]
+            return [
+                [str(index), *task.to_row()]
+                for index, task in enumerate(self._tasks, start=1)
+            ]
 
     def _worker_loop(self) -> None:
         """Background thread loop to process tasks sequentially."""

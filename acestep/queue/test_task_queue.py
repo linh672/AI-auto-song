@@ -7,6 +7,7 @@ import acestep.ui.gradio.events.results.generation_progress
 from acestep.queue.task_model import GenerationTask
 from acestep.queue.task_queue_manager import TaskQueueManager
 from acestep.queue.task_worker import apply_task_lora, execute_task
+from acestep.ui.gradio.events.queue_handlers import select_task_handler
 
 
 class TestGenerationTask(unittest.TestCase):
@@ -44,6 +45,16 @@ class TestTaskQueueManager(unittest.TestCase):
         self.assertEqual(len(self.manager.get_tasks()), 1)
         self.assertEqual(self.manager.get_task(task.id), task)
 
+    def test_get_table_rows_includes_one_based_index(self):
+        """Queue table rows include a stable one-based display index."""
+        self.manager.add_task(title="First", params={})
+        self.manager.add_task(title="Second", params={})
+
+        rows = self.manager.get_table_rows()
+
+        self.assertEqual([row[0] for row in rows], ["1", "2"])
+        self.assertEqual([row[2] for row in rows], ["First", "Second"])
+
     def test_cancel_task(self):
         task = self.manager.add_task(title="Cancel me", params={})
         self.assertEqual(task.status, "pending")
@@ -65,6 +76,23 @@ class TestTaskQueueManager(unittest.TestCase):
 
     def test_pause_and_resume(self):
         self.assertFalse(self.manager.is_paused())
+
+    @patch("acestep.ui.gradio.events.queue_handlers.get_task_queue_manager")
+    def test_select_task_returns_all_audio_outputs(self, mock_queue_manager):
+        """Selecting a task returns all generated audio paths for display."""
+        task = GenerationTask(
+            id="preview1",
+            title="Preview Track",
+            output_audio_paths=["/outputs/first.mp3", "/outputs/second.mp3"],
+        )
+        self.manager._tasks.append(task)
+        mock_queue_manager.return_value = self.manager
+
+        updates = select_task_handler(task.id)
+
+        self.assertEqual(len(updates), 17)
+        self.assertEqual(updates[8:10], ("/outputs/first.mp3", "/outputs/second.mp3"))
+        self.assertIn("Preview Track", updates[-1])
         self.manager.pause()
         self.assertTrue(self.manager.is_paused())
         self.manager.resume()

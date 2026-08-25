@@ -123,7 +123,8 @@ def register_queue_handlers(
         fn=q_handlers.select_task_handler,
         inputs=[queue_section["task_select_dropdown"]],
         outputs=[
-            queue_section["task_audio_preview"],
+            *queue_section["task_audio_columns"],
+            *queue_section["task_audio_previews"],
             queue_section["task_details_markdown"],
         ],
     )
