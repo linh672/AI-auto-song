@@ -33,8 +33,9 @@ def add_to_queue_handler(
     repaint_mode: str, repaint_strength: float,
     retake_variance: float, retake_seed: str,
     lora_path: str, use_lora: bool, lora_scale: float,
+    queue_count: int | float = 1,
 ) -> tuple[Any, ...]:
-    """Capture current UI parameters and enqueue a new generation task."""
+    """Capture current UI parameters and enqueue generation task(s)."""
     title = (captions or lyrics or "Untitled Song").strip().replace("\n", " ")
     if len(title) > 40:
         title = title[:37] + "..."
@@ -79,9 +80,20 @@ def add_to_queue_handler(
         "retake_variance": retake_variance, "retake_seed": retake_seed,
     }
 
+    try:
+        count = max(1, min(int(queue_count), 100))
+    except (ValueError, TypeError):
+        count = 1
+
     qm = get_task_queue_manager()
-    task = qm.add_task(title=title, params=params, lora_path=active_lora, lora_scale=lora_scale)
-    gr.Info(t("queue.task_added", title=task.title))
+    last_task = None
+    for _ in range(count):
+        last_task = qm.add_task(title=title, params=dict(params), lora_path=active_lora, lora_scale=lora_scale)
+
+    if count == 1 and last_task:
+        gr.Info(t("queue.task_added", title=last_task.title))
+    else:
+        gr.Info(t("queue.tasks_added", count=count))
     return refresh_queue_ui_handler()
 
 

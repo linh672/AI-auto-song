@@ -512,6 +512,7 @@
   "queue": {
     "tab_title": "任务队列",
     "add_to_queue_btn": "加入队列",
+    "add_multiple_to_queue_btn": "批量加入",
     "resume_queue_btn": "▶ 恢复队列",
     "pause_queue_btn": "⏸ 暂停队列",
     "clear_completed_btn": "清理已完成",
@@ -530,6 +531,7 @@
     "audio_preview": "任务音频输出",
     "audio_output": "任务音频 {n}",
     "no_audio": "该任务暂无音频输出",
-    "task_added": "任务 '{title}' 已加入队列！"
+    "task_added": "任务 '{title}' 已加入队列！",
+    "tasks_added": "{count} 个任务已加入队列！"
   }
 }

@@ -99,6 +99,88 @@ class TestTaskQueueManager(unittest.TestCase):
         self.assertEqual(updates[8:10], ("/outputs/first.mp3", "/outputs/second.mp3"))
         self.assertIn("Preview Track", updates[-1])
 
+    @patch("acestep.ui.gradio.events.queue_handlers.get_task_queue_manager")
+    @patch("gradio.Info")
+    def test_add_to_queue_handler_batch(self, mock_info, mock_qm):
+        """add_to_queue_handler enqueues multiple tasks when queue_count > 1."""
+        from acestep.ui.gradio.events.queue_handlers import add_to_queue_handler
+
+        mock_qm.return_value = self.manager
+        kwargs = {
+            "captions": "A batch song",
+            "lyrics": "",
+            "bpm": None,
+            "key_scale": "",
+            "time_signature": "",
+            "vocal_language": "en",
+            "inference_steps": 25,
+            "guidance_scale": 7.0,
+            "random_seed_checkbox": True,
+            "seed": "",
+            "reference_audio": None,
+            "audio_duration": 30.0,
+            "batch_size_input": 1,
+            "src_audio": None,
+            "text2music_audio_code_string": "",
+            "repainting_start": 0.0,
+            "repainting_end": 0.0,
+            "instruction_display_gen": "",
+            "audio_cover_strength": 0.5,
+            "cover_noise_strength": 0.0,
+            "task_type": "text2music",
+            "no_fsq": False,
+            "use_adg": False,
+            "cfg_interval_start": 0.0,
+            "cfg_interval_end": 1.0,
+            "shift": 1.0,
+            "infer_method": "ode",
+            "sampler_mode": "euler",
+            "velocity_norm_threshold": 0.0,
+            "velocity_ema_factor": 0.0,
+            "dcw_enabled": False,
+            "dcw_mode": "double",
+            "dcw_scaler": 0.05,
+            "dcw_high_scaler": 0.02,
+            "dcw_wavelet": "haar",
+            "custom_timesteps": "",
+            "audio_format": "mp3",
+            "mp3_bitrate": "320k",
+            "mp3_sample_rate": 48000,
+            "lm_temperature": 0.85,
+            "think_checkbox": False,
+            "lm_cfg_scale": 2.0,
+            "lm_top_k": 0,
+            "lm_top_p": 0.9,
+            "lm_negative_prompt": "NO USER INPUT",
+            "use_cot_metas": True,
+            "use_cot_caption": False,
+            "use_cot_language": True,
+            "is_format_caption": False,
+            "constrained_decoding_debug": False,
+            "allow_lm_batch": True,
+            "auto_score": False,
+            "auto_lrc": False,
+            "score_scale": 0.1,
+            "lm_batch_chunk_size": 8,
+            "enable_normalization": False,
+            "normalization_db": -14.0,
+            "fade_in_duration": 0.0,
+            "fade_out_duration": 0.0,
+            "latent_shift": 0.0,
+            "latent_rescale": 1.0,
+            "repaint_mode": "balanced",
+            "repaint_strength": 0.5,
+            "retake_variance": 0.0,
+            "retake_seed": "",
+            "lora_path": "",
+            "use_lora": False,
+            "lora_scale": 1.0,
+            "queue_count": 3,
+        }
+        add_to_queue_handler(**kwargs)
+        self.assertEqual(len(self.manager.get_tasks()), 3)
+        mock_info.assert_called_once()
+
 
 class TestTaskWorker(unittest.TestCase):
     """Test task execution and LoRA switching."""

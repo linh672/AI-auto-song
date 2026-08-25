@@ -547,6 +547,7 @@
   "queue": {
     "tab_title": "Task Queue",
     "add_to_queue_btn": "Add to Queue",
+    "add_multiple_to_queue_btn": "Add Batch",
     "resume_queue_btn": "▶ Resume Queue",
     "pause_queue_btn": "⏸ Pause Queue",
     "clear_completed_btn": "Clear Completed",
@@ -565,6 +566,7 @@
     "audio_preview": "Task Audio Output",
     "audio_output": "Task Audio {n}",
     "no_audio": "No audio output for this task",
-    "task_added": "Task '{title}' added to queue!"
+    "task_added": "Task '{title}' added to queue!",
+    "tasks_added": "{count} tasks added to queue!"
   }
 }

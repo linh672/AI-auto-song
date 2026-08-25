@@ -92,7 +92,7 @@ def build_generate_row_controls(
             lm_initialized=lm_initialized,
             service_mode=service_mode,
         )
-        with gr.Column(scale=14):
+        with gr.Column(scale=11):
             generate_btn = gr.Button(
                 t("generation.generate_btn"),
                 variant="primary",
@@ -100,7 +100,7 @@ def build_generate_row_controls(
                 interactive=generate_btn_interactive,
                 elem_id="acestep-generate-btn",
             )
-        with gr.Column(scale=4):
+        with gr.Column(scale=3):
             add_to_queue_btn = gr.Button(
                 t("queue.add_to_queue_btn"),
                 variant="secondary",
@@ -108,12 +108,36 @@ def build_generate_row_controls(
                 interactive=True,
                 elem_id="acestep-add-to-queue-btn",
             )
+        with gr.Column(scale=4):
+            with gr.Row(equal_height=True):
+                queue_count = gr.Number(
+                    value=5,
+                    minimum=1,
+                    maximum=100,
+                    step=1,
+                    precision=0,
+                    show_label=False,
+                    container=False,
+                    scale=1,
+                    min_width=50,
+                    elem_id="acestep-queue-count-input",
+                )
+                add_multiple_to_queue_btn = gr.Button(
+                    t("queue.add_multiple_to_queue_btn"),
+                    variant="secondary",
+                    size="lg",
+                    interactive=True,
+                    scale=2,
+                    elem_id="acestep-add-multiple-to-queue-btn",
+                )
         autogen_checkbox, auto_lrc = _build_right_generate_toggles(service_mode=service_mode)
     return {
         "think_checkbox": think_checkbox,
         "auto_score": auto_score,
         "generate_btn": generate_btn,
         "add_to_queue_btn": add_to_queue_btn,
+        "queue_count": queue_count,
+        "add_multiple_to_queue_btn": add_multiple_to_queue_btn,
         "generate_btn_row": generate_btn_row,
         "autogen_checkbox": autogen_checkbox,
         "auto_lrc": auto_lrc,
