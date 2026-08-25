@@ -416,42 +416,58 @@ def _find_input_video(input_dir: Path) -> Path:
     return mp4_files[0]
 
 
+def _write_concat_list(video: Path, loops: int, out_file: Path) -> None:
+    """Write an ffmpeg concat demuxer file listing *video* repeated *loops* times.
+
+    Using a concat list avoids ``-stream_loop`` which forces ffmpeg to
+    pre-index every virtual copy before encoding the first frame -- a hang
+    of several minutes for thousands of loops.
+
+    Args:
+        video: Absolute path to the source video clip.
+        loops: Number of times to repeat the clip (>= 1).
+        out_file: Destination path for the generated text file.
+    """
+    # ffmpeg concat demuxer requires forward-slash paths on all platforms.
+    safe_path = str(video.resolve()).replace("\\", "/")
+    with out_file.open("w", encoding="utf-8") as fh:
+        for _ in range(max(1, loops)):
+            fh.write(f"file '{safe_path}'\n")
+
+
 def _build_video_cmd(
-    video: Path,
+    concat_list: Path,
     audio: Path,
     out_path: Path,
     total_seconds: float,
-    video_duration: float,
     encoder: str,
 ) -> list[str]:
     """Build the ffmpeg command that loops the video and merges the audio in one pass.
 
-    Combines the loop + merge into a single ffmpeg invocation to avoid writing
-    an intermediate looped file, saving both disk I/O and time.
+    Uses a concat demuxer list file so ffmpeg starts encoding immediately
+    without pre-indexing thousands of virtual input copies.
 
     Args:
-        video: Source video file.
+        concat_list: Path to the concat demuxer text file listing video copies.
         audio: Concatenated audio WAV file.
         out_path: Final output MP4 path.
         total_seconds: Target duration (audio length).
-        video_duration: Duration of the source video clip.
         encoder: Video encoder to use (e.g. ``'h264_nvenc'`` or ``'libx264'``).
 
     Returns:
         List of command-line arguments for subprocess.
     """
-    loops_needed = max(0, int(total_seconds / video_duration))
     is_nvenc = "nvenc" in encoder
 
     cmd = [
         "ffmpeg",
         "-y",
         "-threads", str(CPU_THREADS),
-        # Loop the video input; -an strips its original audio so it cannot
-        # interfere with the song audio we supply as a second input.
-        "-stream_loop", str(loops_needed),
+        # Concat demuxer reads the list file lazily -- no pre-indexing hang.
+        "-f", "concat",
+        "-safe", "0",
         "-an",                       # mute the source video track
-        "-i", str(video),
+        "-i", str(concat_list),
         # Concatenated songs audio (WAV PCM -- lossless, re-encoded to AAC below)
         "-i", str(audio),
         # Explicit stream mapping: video from input 0, audio from input 1 only.
@@ -702,12 +718,14 @@ def main() -> None:
         print(f"      Output       : {final_output.name}")
 
         t2 = time.perf_counter()
+        # Write a concat demuxer list so ffmpeg streams lazily (no pre-index hang).
+        concat_list = tmp_path / "video_concat.txt"
+        _write_concat_list(ready_video, plays, concat_list)
         cmd = _build_video_cmd(
-            video=ready_video,
+            concat_list=concat_list,
             audio=concat_wav,
             out_path=final_output,
             total_seconds=total_duration,
-            video_duration=video_duration,
             encoder=encoder,
         )
 
