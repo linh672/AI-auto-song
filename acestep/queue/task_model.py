@@ -1,6 +1,7 @@
 """Dataclass definitions for the generation task queue."""
 
 from dataclasses import dataclass, field
+from html import escape
 import time
 from typing import Any
 import uuid
@@ -38,19 +39,30 @@ class GenerationTask:
             else "None (Base)"
         )
 
-        status_icons = {
-            "pending": "⏳ Pending",
-            "running": "🔄 Running",
-            "completed": "✅ Done",
-            "failed": "❌ Failed",
-            "cancelled": "🚫 Cancelled",
+        status_display = {
+            "pending": ("Pending", "#eab308", "M12 6v6l4 2"),
+            "running": ("Running", "#3b82f6", "M12 6v6l4 2"),
+            "completed": ("Done", "#22c55e", "m5 12 4 4L19 6"),
+            "failed": ("Failed", "#ef4444", "m6 6 12 12M18 6 6 18"),
+            "cancelled": ("Cancelled", "#94a3b8", "M6 6l12 12M18 6 6 18"),
         }
-        status_display = status_icons.get(self.status, self.status)
+        status_label, status_color, status_path = status_display.get(
+            self.status,
+            (self.status, "#94a3b8", "M12 8v4m0 4h.01"),
+        )
+        status_html = (
+            '<span style="align-items:center;display:inline-flex;gap:8px">'
+            f'<svg aria-hidden="true" fill="none" height="20" '
+            f'stroke="{status_color}" stroke-linecap="round" stroke-linejoin="round" '
+            'stroke-width="2.5" viewBox="0 0 24 24" width="20">'
+            f'<circle cx="12" cy="12" r="9"></circle><path d="{status_path}"></path></svg>'
+            f"<span>{escape(status_label)}</span></span>"
+        )
 
         return [
             self.id,
             self.title[:30] + ("..." if len(self.title) > 30 else ""),
             lora_display,
-            status_display,
+            status_html,
             created_str,
         ]

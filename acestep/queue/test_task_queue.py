@@ -24,7 +24,8 @@ class TestGenerationTask(unittest.TestCase):
         self.assertEqual(row[0], "test1234")
         self.assertEqual(row[1], "Lofi Chill Beat")
         self.assertEqual(row[2], "my_lora")
-        self.assertEqual(row[3], "⏳ Pending")
+        self.assertIn("Pending", row[3])
+        self.assertIn("<svg", row[3])
 
 
 class TestTaskQueueManager(unittest.TestCase):

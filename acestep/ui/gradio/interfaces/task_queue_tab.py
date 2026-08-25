@@ -55,7 +55,7 @@ def create_task_queue_section() -> dict[str, Any]:
                 t("queue.col_status"),
                 t("queue.col_created"),
             ],
-            datatype=["str", "str", "str", "str", "str", "str"],
+            datatype=["str", "str", "str", "str", "html", "str"],
             value=[],
             interactive=False,
             elem_id="task-queue-table",
