@@ -45,6 +45,9 @@ def execute_task(
         dit_handler: DiT handler instance.
         llm_handler: LLM handler instance.
     """
+    import time
+
+    task.started_at = time.time()
     task.status = "running"
     task.progress = 0.05
     task.status_message = "Setting up LoRA..."
@@ -147,12 +150,14 @@ def execute_task(
             error_detail = generation_status or "Generation completed without producing audio."
             raise RuntimeError(error_detail)
 
+        task.completed_at = time.time()
         task.status = "completed"
         task.progress = 1.0
         task.status_message = "Generation complete!"
         logger.info(f"[TaskQueue] Task {task.id} finished successfully with {len(task.output_audio_paths)} audios")
 
     except Exception as exc:
+        task.completed_at = time.time()
         task.status = "failed"
         task.progress = 1.0
         task.error_message = str(exc)

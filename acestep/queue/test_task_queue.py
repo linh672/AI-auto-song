@@ -238,6 +238,44 @@ class TestTaskWorker(unittest.TestCase):
         self.assertEqual(task.status, "failed")
         self.assertEqual(task.output_audio_paths, [])
         self.assertEqual(task.error_message, "❌ VAE decoder failed")
+        self.assertIsNotNone(task.started_at)
+        self.assertIsNotNone(task.completed_at)
+
+
+class TestQueueTiming(unittest.TestCase):
+    """Test timing tracking and duration formatting."""
+
+    def test_format_duration(self):
+        from acestep.ui.gradio.events.queue_handlers import _format_duration
+
+        self.assertEqual(_format_duration(45), "0m 45s")
+        self.assertEqual(_format_duration(125), "2m 05s")
+        self.assertEqual(_format_duration(3665), "1h 01m 05s")
+
+    def test_queue_timing_info(self):
+        manager = TaskQueueManager()
+        timing = manager.get_timing_info()
+        self.assertFalse(timing["is_running"])
+        self.assertIsNone(timing["batch_elapsed"])
+
+        manager._batch_start_time = 100.0
+        with patch("time.time", return_value=150.0):
+            timing = manager.get_timing_info()
+            self.assertEqual(timing["batch_elapsed"], 50.0)
+
+    @patch("acestep.ui.gradio.events.queue_handlers.get_task_queue_manager")
+    def test_refresh_queue_ui_shows_last_batch_duration(self, mock_qm):
+        from acestep.ui.gradio.events.queue_handlers import refresh_queue_ui_handler
+
+        manager = TaskQueueManager()
+        manager._last_batch_duration = 75.0
+        manager._last_batch_task_count = 3
+        mock_qm.return_value = manager
+
+        status_md, _, _, _ = refresh_queue_ui_handler()
+        self.assertIn("Total Queue Duration", status_md)
+        self.assertIn("1m 15s", status_md)
+        self.assertIn("3 tasks completed", status_md)
 
 
 if __name__ == "__main__":

@@ -16,7 +16,9 @@ class GenerationTask:
     created_at: float = field(default_factory=time.time)
     status: str = "pending"  # pending, running, completed, failed, cancelled
     progress: float = 0.0
-    status_message: str = "Pending in queue"
+    # Timing timestamps
+    started_at: float | None = None
+    completed_at: float | None = None
 
     # LoRA configuration for this specific task
     lora_path: str | None = None

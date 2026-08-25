@@ -97,21 +97,54 @@ def add_to_queue_handler(
     return refresh_queue_ui_handler()
 
 
+def _format_duration(seconds: float) -> str:
+    """Format duration in seconds into a human-readable string.
+
+    Args:
+        seconds: Duration in seconds.
+
+    Returns:
+        Formatted string like '1h 23m 45s' or '3m 12s'.
+    """
+    total_secs = int(seconds)
+    hours, remainder = divmod(total_secs, 3600)
+    mins, secs = divmod(remainder, 60)
+    if hours > 0:
+        return f"{hours}h {mins:02d}m {secs:02d}s"
+    return f"{mins}m {secs:02d}s"
+
+
 def refresh_queue_ui_handler() -> tuple[str, list[list[str]], dict[str, Any], str]:
     """Return updated UI representations for the queue status, table, and dropdown."""
     qm = get_task_queue_manager()
     active = qm.get_active_task()
+    timing = qm.get_timing_info()
 
     if active:
         pct = int(active.progress * 100)
+        task_time_str = ""
+        if timing.get("active_elapsed") is not None:
+            task_time_str = f" | **Task Time**: {_format_duration(timing['active_elapsed'])}"
+
+        queue_time_str = ""
+        if timing.get("batch_elapsed") is not None:
+            queue_time_str = f"\n**Total Queue Time**: {_format_duration(timing['batch_elapsed'])}"
+
         status_md = (
             f"### {t('queue.active_task')}: **{active.title}** (`{active.id}`)\n"
-            f"**Status**: {active.status_message} ({pct}%)\n"
-            f"**LoRA**: `{active.lora_path or 'Base Model'}`"
+            f"**Status**: {active.status_message} ({pct}%){task_time_str}\n"
+            f"**LoRA**: `{active.lora_path or 'Base Model'}`{queue_time_str}"
         )
     else:
         paused_txt = " *(Paused)*" if qm.is_paused() else ""
-        status_md = f"### {t('queue.active_task')}\n*{t('queue.no_active_task')}*{paused_txt}"
+        duration_info = ""
+        last_dur = timing.get("last_batch_duration")
+        last_count = timing.get("last_batch_task_count", 0)
+        if last_dur is not None:
+            count_str = f" ({last_count} task{'s' if last_count != 1 else ''} completed)" if last_count > 0 else ""
+            duration_info = f"\n\n**Total Queue Duration**: {_format_duration(last_dur)}{count_str}"
+
+        status_md = f"### {t('queue.active_task')}\n*{t('queue.no_active_task')}*{paused_txt}{duration_info}"
 
     rows = qm.get_table_rows()
     tasks = qm.get_tasks()
@@ -155,10 +188,15 @@ def select_task_handler(selected_task_id: str | None) -> tuple[Any, ...]:
     task = qm.get_task(selected_task_id)
     if not task:
         return (*_build_task_audio_updates([]), f"*{t('queue.no_audio')}*")
-    
+
+    exec_time_str = ""
+    if task.started_at and task.completed_at:
+        dur = task.completed_at - task.started_at
+        exec_time_str = f" | **Execution Time**: `{_format_duration(dur)}`"
+
     details = (
         f"### Task `{task.id}`: {task.title}\n"
-        f"- **Status**: `{task.status}`\n"
+        f"- **Status**: `{task.status}`{exec_time_str}\n"
         f"- **LoRA Adapter**: `{task.lora_path or 'None (Base Model)'}` (Scale: `{task.lora_scale}`)\n"
         f"- **Duration**: `{task.params.get('audio_duration', 30)}s` | **BPM**: `{task.params.get('bpm', 'Auto')}`\n"
         f"- **Seed**: `{task.params.get('seed') or 'Random'}`\n"

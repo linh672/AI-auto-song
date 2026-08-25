@@ -21,6 +21,11 @@ class TaskQueueManager:
         self._dit_handler: Any = None
         self._llm_handler: Any = None
         self._active_task_id: str | None = None
+        self._batch_start_time: float | None = None
+        self._batch_end_time: float | None = None
+        self._last_batch_duration: float | None = None
+        self._last_batch_task_count: int = 0
+        self._batch_task_count: int = 0
 
     def initialize_handlers(self, dit_handler: Any, llm_handler: Any) -> None:
         """Register model handlers for queue worker."""
@@ -115,6 +120,38 @@ class TaskQueueManager:
             return None
         return self.get_task(self._active_task_id)
 
+    def get_timing_info(self) -> dict[str, Any]:
+        """Return timing information for the queue and active task.
+
+        Returns:
+            Dictionary containing is_running, batch_elapsed, active_elapsed,
+            last_batch_duration, and last_batch_task_count.
+        """
+        with self._lock:
+            now = time.time()
+            is_running = self._active_task_id is not None or any(
+                t.status == "pending" for t in self._tasks
+            )
+
+            batch_elapsed = None
+            if self._batch_start_time is not None:
+                batch_elapsed = now - self._batch_start_time
+
+            active_elapsed = None
+            if self._active_task_id:
+                for task in self._tasks:
+                    if task.id == self._active_task_id and task.started_at:
+                        active_elapsed = now - task.started_at
+                        break
+
+            return {
+                "is_running": is_running,
+                "batch_elapsed": batch_elapsed,
+                "active_elapsed": active_elapsed,
+                "last_batch_duration": self._last_batch_duration,
+                "last_batch_task_count": self._last_batch_task_count,
+            }
+
     def get_table_rows(self) -> list[list[str]]:
         """Return rows for UI dataframe display."""
         with self._lock:
@@ -138,14 +175,27 @@ class TaskQueueManager:
                         break
 
             if next_task is None:
+                with self._lock:
+                    if self._batch_start_time is not None:
+                        self._batch_end_time = time.time()
+                        self._last_batch_duration = self._batch_end_time - self._batch_start_time
+                        self._last_batch_task_count = self._batch_task_count
+                        self._batch_start_time = None
                 self._active_task_id = None
                 time.sleep(1.0)
                 continue
 
-            self._active_task_id = next_task.id
+            with self._lock:
+                if self._batch_start_time is None:
+                    self._batch_start_time = time.time()
+                    self._batch_task_count = 0
+                self._batch_task_count += 1
+                self._active_task_id = next_task.id
+
             logger.info(f"[TaskQueue] Starting execution of task {next_task.id}: {next_task.title}")
             execute_task(next_task, self._dit_handler, self._llm_handler)
-            self._active_task_id = None
+            with self._lock:
+                self._active_task_id = None
             time.sleep(0.5)
 
 
