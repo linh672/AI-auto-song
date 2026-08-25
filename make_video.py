@@ -48,6 +48,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+from tqdm import tqdm
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -212,7 +214,28 @@ def _probe_durations_parallel(paths: list[Path]) -> dict[Path, float]:
     return results
 
 
-def _concat_audio(mp3_files: list[Path], out_path: Path) -> float:
+def _format_seconds(seconds: float) -> str:
+    """Format duration in seconds into a human-readable string.
+
+    Args:
+        seconds: Duration in seconds.
+
+    Returns:
+        Formatted string like '1h 23m 45s' or '3m 12s'.
+    """
+    total_secs = int(seconds)
+    hours, remainder = divmod(total_secs, 3600)
+    mins, secs = divmod(remainder, 60)
+    if hours > 0:
+        return f"{hours}h {mins:02d}m {secs:02d}s"
+    return f"{mins}m {secs:02d}s"
+
+
+def _concat_audio(
+    mp3_files: list[Path],
+    out_path: Path,
+    expected_duration: float | None = None,
+) -> float:
     """Concatenate *mp3_files* into a single WAV file at *out_path*.
 
     Uses ffmpeg concat demuxer with ``-threads`` set to ``CPU_THREADS`` so the
@@ -221,6 +244,7 @@ def _concat_audio(mp3_files: list[Path], out_path: Path) -> float:
     Args:
         mp3_files: Ordered list of MP3 paths to concatenate.
         out_path: Destination WAV file path.
+        expected_duration: Optional total expected duration in seconds for progress bar.
 
     Returns:
         Total duration of the concatenated audio in seconds.
@@ -243,15 +267,20 @@ def _concat_audio(mp3_files: list[Path], out_path: Path) -> float:
         "-c:a", "pcm_s16le",
         str(out_path),
     ]
-    print(f"  [ffmpeg] Concatenating {len(mp3_files)} MP3(s) -> {out_path.name}")
-    proc = subprocess.run(cmd, capture_output=True)
-    list_file.unlink(missing_ok=True)
-    if proc.returncode != 0:
-        raise RuntimeError(f"ffmpeg concat failed:\n{proc.stderr.decode()}")
+    try:
+        if expected_duration and expected_duration > 0:
+            _run_ffmpeg_with_progress(
+                cmd,
+                total_seconds=expected_duration,
+                desc="      Audio concat",
+            )
+        else:
+            _run_ffmpeg(cmd, "Audio concat")
+    finally:
+        list_file.unlink(missing_ok=True)
 
     duration = _probe_duration(out_path)
-    mins, secs = divmod(duration, 60)
-    print(f"  Total audio duration: {int(mins)}m {secs:.1f}s  ({duration:.2f}s)")
+    print(f"      Total audio duration: {_format_seconds(duration)}  ({duration:.2f}s)")
     return duration
 
 
@@ -349,6 +378,114 @@ def _build_video_cmd(
     return cmd
 
 
+def _parse_time_str(time_str: str) -> float | None:
+    """Parse HH:MM:SS.micro into seconds.
+
+    Args:
+        time_str: Timestamp string from ffmpeg (e.g. '01:23:45.67').
+
+    Returns:
+        Seconds as a float or None if parsing fails.
+    """
+    parts = time_str.split(":")
+    if len(parts) == 3:
+        try:
+            return float(parts[0]) * 3600 + float(parts[1]) * 60 + float(parts[2])
+        except ValueError:
+            return None
+    return None
+
+
+def _run_ffmpeg_with_progress(cmd: list[str], total_seconds: float, desc: str) -> None:
+    """Run an ffmpeg command while streaming progress to a tqdm progress bar.
+
+    Args:
+        cmd: Full ffmpeg command list.
+        total_seconds: Target duration in seconds for progress calculation.
+        desc: Progress bar description / label.
+
+    Raises:
+        RuntimeError: If ffmpeg exits with a non-zero return code.
+    """
+    full_cmd = [cmd[0], "-progress", "pipe:1", "-nostats"] + cmd[1:]
+    proc = subprocess.Popen(
+        full_cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1,
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    last_time = 0.0
+    with tqdm(
+        total=round(total_seconds, 1),
+        desc=desc,
+        unit="s",
+        dynamic_ncols=True,
+        bar_format="{l_bar}{bar}| {n:.1f}/{total:.1f}s [{elapsed}<{remaining}, {rate_fmt}{postfix}]",
+    ) as pbar:
+        speed_str = ""
+        fps_str = ""
+        while True:
+            line = proc.stdout.readline() if proc.stdout else ""
+            if not line and proc.poll() is not None:
+                break
+            line = line.strip()
+            if not line or "=" not in line:
+                continue
+
+            key, val = line.split("=", 1)
+            key = key.strip()
+            val = val.strip()
+
+            cur_time: float | None = None
+            if key == "out_time_us":
+                try:
+                    cur_time = int(val) / 1_000_000.0
+                except ValueError:
+                    pass
+            elif key == "out_time_ms":
+                try:
+                    cur_time = int(val) / 1_000.0
+                except ValueError:
+                    pass
+            elif key == "out_time":
+                cur_time = _parse_time_str(val)
+            elif key == "speed":
+                speed_str = val
+            elif key == "fps":
+                try:
+                    if float(val) > 0:
+                        fps_str = f"{val}fps"
+                except ValueError:
+                    pass
+
+            if cur_time is not None:
+                delta = cur_time - last_time
+                if delta > 0:
+                    pbar.update(min(delta, max(0.0, total_seconds - last_time)))
+                    last_time = cur_time
+
+            if key == "progress":
+                postfix = []
+                if speed_str:
+                    postfix.append(f"speed={speed_str}")
+                if fps_str:
+                    postfix.append(fps_str)
+                if postfix:
+                    pbar.set_postfix_str(", ".join(postfix))
+
+        if last_time < total_seconds:
+            pbar.update(max(0.0, total_seconds - last_time))
+
+    stderr_output = proc.stderr.read() if proc.stderr else ""
+    proc.wait()
+    if proc.returncode != 0:
+        raise RuntimeError(f"{desc.strip()} failed (exit code {proc.returncode}):\n{stderr_output.strip()}")
+
+
 def _run_ffmpeg(cmd: list[str], step_name: str) -> None:
     """Run an ffmpeg command, raising RuntimeError on failure.
 
@@ -409,8 +546,7 @@ def main() -> None:
 
     for i, f in enumerate(mp3_files, 1):
         d = durations[f]
-        m, s = divmod(d, 60)
-        print(f"      {i:>2}. {f.parent.name}/{f.name}  [{int(m)}m{s:.0f}s]")
+        print(f"      {i:>2}. {f.parent.name}/{f.name}  [{_format_seconds(d)}]")
     print(f"      (probed in {probe_secs:.2f}s)")
 
     video_duration = durations[input_video]
@@ -424,15 +560,15 @@ def main() -> None:
         tmp_path = Path(tmp)
         concat_wav = tmp_path / "concat_audio.wav"
 
-        print(f"\n[2/3] Concatenating audio...")
+        print(f"\n[2/3] Concatenating {len(mp3_files)} audio file(s) ({_format_seconds(total_mp3_duration)} total)...")
         t1 = time.perf_counter()
-        total_duration = _concat_audio(mp3_files, concat_wav)
+        total_duration = _concat_audio(mp3_files, concat_wav, expected_duration=total_mp3_duration)
         print(f"      Done in {time.perf_counter() - t1:.1f}s")
 
         # 3. Loop video + merge audio in ONE ffmpeg pass (no intermediate file)
         final_output = OUTPUT_DIR / f"{timestamp}_final.mp4"
         encoder = gpu_encoder or "libx264"
-        print(f"\n[3/3] Loop video ({video_duration:.1f}s x~{plays}) + merge audio -> GPU encode")
+        print(f"\n[3/3] Loop video ({_format_seconds(video_duration)} x~{plays}) + merge audio -> {encoder} encode")
         print(f"      Source video : {input_video.name}")
         print(f"      Encoder      : {encoder}")
         print(f"      Output       : {final_output.name}")
@@ -447,7 +583,11 @@ def main() -> None:
             encoder=encoder,
         )
 
-        _run_ffmpeg(cmd, f"loop+merge ({encoder})")
+        _run_ffmpeg_with_progress(
+            cmd,
+            total_seconds=total_duration,
+            desc=f"      Video encode ({encoder})",
+        )
 
         encode_secs = time.perf_counter() - t2
         print(f"      Encoded in {encode_secs:.1f}s")
