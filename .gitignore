@@ -263,3 +263,6 @@ docs/.vitepress/dist/
 docs/.vitepress/cache/
 docs/en/awesome.md
 package-lock.json
+
+# Local Real-ESRGAN executable and model weights for make_video.py
+tools/

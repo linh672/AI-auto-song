@@ -279,6 +279,34 @@ See also the **LoRA Training** tab in Gradio UI for one-click training, or [Grad
 | `acestep-5Hz-lm-1.7B` | Qwen3-1.7B | ✅ | ✅ | ✅ | ✅ | ✅ | Medium | Medium | Medium | ✅ |
 | `acestep-5Hz-lm-4B` | Qwen3-4B | ✅ | ✅ | ✅ | ✅ | ✅ | Strong | Strong | Strong | ✅ |
 
+## 🎬 Audio-to-Video Builder
+
+`make_video.py` combines every MP3 under `gradio_outputs/` with the first MP4
+in `input/`, looping the clip to match the total audio duration. The result is
+written to `output/<timestamp>_final.mp4`.
+
+```powershell
+python make_video.py
+```
+
+The builder requires FFmpeg and FFprobe on `PATH`. When the bundled
+`tools/realesrgan-ncnn-vulkan.exe` is available, it uses the Real-ESRGAN
+`realesr-animevideov3` GPU model to enhance low-resolution animated clips
+before producing the 1080p video. The final loop is encoded at a constant frame
+rate to prevent a pause at each loop boundary.
+
+To use the faster Lanczos-only path for one PowerShell session:
+
+```powershell
+$env:ACE_STEP_AI_UPSCALE=0
+python make_video.py
+```
+
+The local Real-ESRGAN executable and models are intentionally ignored by Git.
+Download the official portable Windows release from the
+[Real-ESRGAN project](https://github.com/xinntao/Real-ESRGAN) and extract it
+into `tools/` if it is not already present.
+
 ## 🔬 Benchmark
 
 ACE-Step 1.5 includes `profile_inference.py`, a profiling & benchmarking tool that measures LLM, DiT, and VAE timing across devices and configurations.
