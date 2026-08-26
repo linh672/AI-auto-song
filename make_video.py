@@ -28,9 +28,9 @@ To unlock GPU encoding, update your NVIDIA driver:
 Optimisations applied
 ----------------------
 - Parallel ffprobe calls (ThreadPoolExecutor, up to CPU_THREADS workers).
-- Upscale the short input video once before looping to save massive compute.
-- Loop + merge in a single ffmpeg pass (no intermediate looped video file).
-- NVENC pre-check via ``nvidia-smi`` driver version before attempting encode.
+- Upscale the short input video once before looping using NVENC.
+- Stream-copy looped video (-c:v copy with -stream_loop -1) to mux 4+ hours in seconds without re-encoding.
+- NVENC pre-check via ``nvidia-smi`` driver version before attempting upscale encode.
 - ``-threads`` tuned for i9-14HX P-core count.
 - Audio concat decodes MP3s once to PCM -- no intermediate transcode.
 
@@ -46,6 +46,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -316,6 +317,22 @@ def _probe_resolution(path: Path) -> tuple[int, int]:
         raise RuntimeError(f"Could not parse resolution from {path}: {result.stdout.strip()}") from exc
 
 
+def _build_cover_scale_filter(target_w: int, target_h: int) -> str:
+    """Return an ffmpeg filter that fills a frame with a centered crop.
+
+    Args:
+        target_w: Required output width in pixels.
+        target_h: Required output height in pixels.
+
+    Returns:
+        Filter string that scales to cover and crops excess pixels without padding.
+    """
+    return (
+        f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase:flags=lanczos,"
+        f"crop={target_w}:{target_h}:(iw-ow)/2:(ih-oh)/2,setsar=1"
+    )
+
+
 def _upscale_video_to_1080p(
     video_path: Path,
     out_path: Path,
@@ -326,7 +343,7 @@ def _upscale_video_to_1080p(
 
     If the video is already 1080p (or higher), returns *video_path* unchanged.
     Otherwise, scales the video to 1080p (1920x1080 for landscape, 1080x1920 for portrait)
-    using high-quality Lanczos resampling and aspect ratio preservation, saving to *out_path*.
+    using high-quality Lanczos resampling and a centered crop to fill the frame, saving to *out_path*.
 
     Args:
         video_path: Source input video file.
@@ -347,10 +364,7 @@ def _upscale_video_to_1080p(
 
     print(f"      Upscaling video: {width}x{height} -> {target_w}x{target_h} (1080p)...")
 
-    vf = (
-        f"scale={target_w}:{target_h}:force_original_aspect_ratio=decrease:flags=lanczos,"
-        f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1"
-    )
+    vf = _build_cover_scale_filter(target_w, target_h)
 
     is_nvenc = "nvenc" in encoder
     cmd = [
@@ -416,93 +430,67 @@ def _find_input_video(input_dir: Path) -> Path:
     return mp4_files[0]
 
 
-def _write_concat_list(video: Path, loops: int, out_file: Path) -> None:
-    """Write an ffmpeg concat demuxer file listing *video* repeated *loops* times.
 
-    Using a concat list avoids ``-stream_loop`` which forces ffmpeg to
-    pre-index every virtual copy before encoding the first frame -- a hang
-    of several minutes for thousands of loops.
+def _remux_to_ts(video_mp4: Path, out_ts: Path) -> Path:
+    """Remux MP4 to MPEG-TS container without re-encoding.
+
+    MPEG-TS has no index/moov atoms, allowing ffmpeg's ``-stream_loop -1``
+    to loop infinitely in stream-copy mode without hanging on virtual index allocation.
 
     Args:
-        video: Absolute path to the source video clip.
-        loops: Number of times to repeat the clip (>= 1).
-        out_file: Destination path for the generated text file.
+        video_mp4: Input MP4 video.
+        out_ts: Output TS file destination.
+
+    Returns:
+        Path to the output TS file.
     """
-    # ffmpeg concat demuxer requires forward-slash paths on all platforms.
-    safe_path = str(video.resolve()).replace("\\", "/")
-    with out_file.open("w", encoding="utf-8") as fh:
-        for _ in range(max(1, loops)):
-            fh.write(f"file '{safe_path}'\n")
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i", str(video_mp4),
+        "-c:v", "copy",
+        "-an",
+        str(out_ts),
+    ]
+    _run_ffmpeg(cmd, "Remux to TS")
+    return out_ts
 
 
 def _build_video_cmd(
-    concat_list: Path,
+    video_ts: Path,
     audio: Path,
     out_path: Path,
     total_seconds: float,
-    encoder: str,
 ) -> list[str]:
-    """Build the ffmpeg command that loops the video and merges the audio in one pass.
+    """Build the ffmpeg command that loops the TS video and merges audio via stream copy.
 
-    Uses a concat demuxer list file so ffmpeg starts encoding immediately
-    without pre-indexing thousands of virtual input copies.
+    Uses native ``-stream_loop -1`` on MPEG-TS and ``-c:v copy`` so the pre-upscaled 1080p video
+    is muxed directly with AAC audio at disk speed without re-encoding frames or demuxer hangs.
 
     Args:
-        concat_list: Path to the concat demuxer text file listing video copies.
+        video_ts: MPEG-TS video clip to loop.
         audio: Concatenated audio WAV file.
         out_path: Final output MP4 path.
         total_seconds: Target duration (audio length).
-        encoder: Video encoder to use (e.g. ``'h264_nvenc'`` or ``'libx264'``).
 
     Returns:
         List of command-line arguments for subprocess.
     """
-    is_nvenc = "nvenc" in encoder
-
     cmd = [
         "ffmpeg",
         "-y",
         "-threads", str(CPU_THREADS),
-        # Concat demuxer reads the list file lazily -- no pre-indexing hang.
-        "-f", "concat",
-        "-safe", "0",
-        "-an",                       # mute the source video track
-        "-i", str(concat_list),
-        # Concatenated songs audio (WAV PCM -- lossless, re-encoded to AAC below)
+        "-stream_loop", "-1",
+        "-i", str(video_ts),
         "-i", str(audio),
-        # Explicit stream mapping: video from input 0, audio from input 1 only.
         "-map", "0:v:0",
         "-map", "1:a:0",
-        # Trim to exact audio length
-        "-t", str(total_seconds),
-    ]
-
-    if is_nvenc:
-        # GPU encode: upload decoded frames to NVENC on RTX 4060
-        cmd += [
-            "-c:v", encoder,
-            "-preset", NVENC_PRESET,
-            "-tune", NVENC_TUNE,
-            "-cq", NVENC_CQ,
-            "-rc", "vbr",
-            "-b:v", "0",
-            # GPU decode hint (speeds up demux on NVENC path)
-            "-gpu", "0",
-        ]
-    else:
-        # CPU fallback: libx264 ultrafast
-        cmd += [
-            "-c:v", "libx264",
-            "-preset", "ultrafast",
-            "-crf", "23",
-            "-threads", str(CPU_THREADS),
-        ]
-
-    cmd += [
-        # AAC VBR best quality (-q:a 0 ≈ 256-320 kbps)
+        "-c:v", "copy",
         "-c:a", "aac",
         "-q:a", AUDIO_QUALITY,
+        "-t", str(total_seconds),
         "-shortest",
+        "-movflags", "+faststart",
         str(out_path),
     ]
     return cmd
@@ -526,6 +514,19 @@ def _parse_time_str(time_str: str) -> float | None:
     return None
 
 
+def _progress_target(processed_seconds: float, total_seconds: float) -> float:
+    """Return a display value that reserves the final percent for ffmpeg cleanup.
+
+    Args:
+        processed_seconds: Media duration reported by ffmpeg.
+        total_seconds: Expected total media duration.
+
+    Returns:
+        Progress-bar value capped below the total until ffmpeg exits successfully.
+    """
+    return min(max(0.0, processed_seconds), total_seconds * 0.99)
+
+
 def _run_ffmpeg_with_progress(cmd: list[str], total_seconds: float, desc: str) -> None:
     """Run an ffmpeg command while streaming progress to a tqdm progress bar.
 
@@ -547,10 +548,20 @@ def _run_ffmpeg_with_progress(cmd: list[str], total_seconds: float, desc: str) -
         encoding="utf-8",
         errors="replace",
     )
+    stderr_parts: list[str] = []
 
-    last_time = 0.0
+    def _drain_stderr() -> None:
+        """Consume ffmpeg diagnostics so its stderr pipe cannot block the process."""
+        if proc.stderr:
+            stderr_parts.append(proc.stderr.read())
+
+    stderr_thread = threading.Thread(target=_drain_stderr, daemon=True)
+    stderr_thread.start()
+
+    progress_total = round(total_seconds, 1)
+    last_reported_time = 0.0
     with tqdm(
-        total=round(total_seconds, 1),
+        total=progress_total,
         desc=desc,
         unit="s",
         dynamic_ncols=True,
@@ -593,10 +604,10 @@ def _run_ffmpeg_with_progress(cmd: list[str], total_seconds: float, desc: str) -
                     pass
 
             if cur_time is not None:
-                delta = cur_time - last_time
-                if delta > 0:
-                    pbar.update(min(delta, max(0.0, total_seconds - last_time)))
-                    last_time = cur_time
+                last_reported_time = max(last_reported_time, cur_time)
+                target = _progress_target(cur_time, progress_total)
+                if target > pbar.n:
+                    pbar.update(target - pbar.n)
 
             if key == "progress":
                 postfix = []
@@ -604,14 +615,17 @@ def _run_ffmpeg_with_progress(cmd: list[str], total_seconds: float, desc: str) -
                     postfix.append(f"speed={speed_str}")
                 if fps_str:
                     postfix.append(fps_str)
+                if last_reported_time >= total_seconds:
+                    postfix.append("finalizing")
                 if postfix:
                     pbar.set_postfix_str(", ".join(postfix))
 
-        if last_time < total_seconds:
-            pbar.update(max(0.0, total_seconds - last_time))
+        proc.wait()
+        stderr_thread.join()
+        if proc.returncode == 0 and pbar.n < progress_total:
+            pbar.update(progress_total - pbar.n)
 
-    stderr_output = proc.stderr.read() if proc.stderr else ""
-    proc.wait()
+    stderr_output = "".join(stderr_parts)
     if proc.returncode != 0:
         raise RuntimeError(f"{desc.strip()} failed (exit code {proc.returncode}):\n{stderr_output.strip()}")
 
@@ -710,33 +724,34 @@ def main() -> None:
         total_duration = _concat_audio(mp3_files, concat_wav, expected_duration=total_mp3_duration)
         print(f"      Done in {time.perf_counter() - t1:.1f}s")
 
-        # 4. Loop video + merge audio in ONE ffmpeg pass (no intermediate file)
+        # 4. Loop video + merge audio in ONE fast stream-copy pass
         final_output = OUTPUT_DIR / f"{timestamp}_final.mp4"
-        print(f"\n[4/4] Loop video ({_format_seconds(video_duration)} x~{plays}) + merge audio -> {encoder} encode")
+        print(f"\n[4/4] Loop video ({_format_seconds(video_duration)} x~{plays}) + merge audio (stream copy - zero re-encode)")
         print(f"      Source video : {ready_video.name}")
-        print(f"      Encoder      : {encoder}")
+        print(f"      Video stream : copy (lossless, instant via MPEG-TS)")
+        print(f"      Audio codec  : aac (VBR q={AUDIO_QUALITY})")
         print(f"      Output       : {final_output.name}")
 
         t2 = time.perf_counter()
-        # Write a concat demuxer list so ffmpeg streams lazily (no pre-index hang).
-        concat_list = tmp_path / "video_concat.txt"
-        _write_concat_list(ready_video, plays, concat_list)
+        # Convert short video to TS container to avoid MP4 moov index pre-allocation hang
+        loop_ts = tmp_path / "loop_source.ts"
+        _remux_to_ts(ready_video, loop_ts)
+
         cmd = _build_video_cmd(
-            concat_list=concat_list,
+            video_ts=loop_ts,
             audio=concat_wav,
             out_path=final_output,
             total_seconds=total_duration,
-            encoder=encoder,
         )
 
         _run_ffmpeg_with_progress(
             cmd,
             total_seconds=total_duration,
-            desc=f"      Video encode ({encoder})",
+            desc="      Video stream copy & mux",
         )
 
         encode_secs = time.perf_counter() - t2
-        print(f"      Encoded in {encode_secs:.1f}s")
+        print(f"      Muxed in {encode_secs:.1f}s")
 
     size_mb = final_output.stat().st_size / 1_048_576
     total_elapsed = time.perf_counter() - start_total_time
