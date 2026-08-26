@@ -5,11 +5,11 @@ Workflow
 --------
 1. Scan ``gradio_outputs/`` recursively for every ``*.mp3`` file.
 2. Probe all MP3 durations and input video resolution in parallel.
-3. Upscale the input video in ``input/`` to 1080p if below 1080p.
-4. Concatenate MP3s (in folder-name order) into a single draft audio track.
-5. Loop-extend the 1080p video to match that duration.
-6. Merge the looped video with the concatenated audio and write the result to
-   ``output/<timestamp>_final.mp4``.
+3. Upscale the input video in ``input/`` to 1080p if below 1080p (closed-GOP, no B-frames).
+4. Concatenate MP3s (in folder-name order) into a single AAC audio track.
+5. Loop-extend the 1080p video via MPEG-TS stream-copy to match audio duration.
+6. Merge the looped video with the concatenated audio (zero re-encode) and write
+   the result to ``output/<timestamp>_final.mp4``.
 
 Hardware targets
 ----------------
@@ -20,19 +20,17 @@ Hardware targets
 Encoder selection (auto-detected at runtime)
 --------------------------------------------
 1. h264_nvenc  -- RTX 4060 NVENC (requires NVIDIA driver >= 570.0)
-2. libx264     -- CPU fallback, preset=ultrafast (fast enough: ~25s for 9 min)
-
-To unlock GPU encoding, update your NVIDIA driver:
-  https://www.nvidia.com/Download/index.aspx
+2. libx264     -- CPU fallback, preset=slow for short clip, ultrafast muxing
 
 Optimisations applied
 ----------------------
 - Parallel ffprobe calls (ThreadPoolExecutor, up to CPU_THREADS workers).
-- Upscale the short input video once before looping using NVENC.
-- Stream-copy looped video (-c:v copy with -stream_loop -1) to mux 4+ hours in seconds without re-encoding.
+- Upscale the short input video ONCE before looping using NVENC/libx264 with closed GOP and no B-frames.
+- Stream-copy looped video (-c:v copy with -stream_loop -1 via MPEG-TS) to mux 4+ hours in seconds without re-encoding.
+- Stream-copy audio (-c:a copy from pre-concatenated AAC track).
+- Bounded stderr ring buffer in progress monitoring to prevent memory leaks during long renders.
 - NVENC pre-check via ``nvidia-smi`` driver version before attempting upscale encode.
 - ``-threads`` tuned for i9-14HX P-core count.
-- Audio concat decodes MP3s once to PCM -- no intermediate transcode.
 
 Dependencies
 ------------
@@ -48,6 +46,7 @@ import sys
 import tempfile
 import threading
 import time
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -74,9 +73,8 @@ NVENC_PRESET = "p2"
 NVENC_TUNE = "hq"       # high-quality tuning mode
 NVENC_CQ = "23"         # constant quality (0=best, 51=worst; ~18-28 is typical)
 
-# AAC audio quality: VBR mode, 0 = best (~256-320 kbps), 2 = good (~160 kbps).
-# Use -q:a (VBR) instead of -b:a (CBR) for better quality/size ratio.
-AUDIO_QUALITY = "0"
+# AAC audio bitrate for concatenated track (320k for pristine music quality)
+AUDIO_BITRATE = "320k"
 
 # AI enhancement is enabled automatically when the bundled Real-ESRGAN executable exists.
 # Set ACE_STEP_AI_UPSCALE=0 to use the faster Lanczos-only fallback.
@@ -245,14 +243,14 @@ def _concat_audio(
     out_path: Path,
     expected_duration: float | None = None,
 ) -> float:
-    """Concatenate *mp3_files* into a single WAV file at *out_path*.
+    """Concatenate *mp3_files* into a single AAC M4A file at *out_path*.
 
     Uses ffmpeg concat demuxer with ``-threads`` set to ``CPU_THREADS`` so the
     MP3 decoder can use multiple threads for the decode pass.
 
     Args:
         mp3_files: Ordered list of MP3 paths to concatenate.
-        out_path: Destination WAV file path.
+        out_path: Destination AAC M4A file path.
         expected_duration: Optional total expected duration in seconds for progress bar.
 
     Returns:
@@ -273,7 +271,8 @@ def _concat_audio(
         "-i", str(list_file),
         "-ar", "44100",
         "-ac", "2",
-        "-c:a", "pcm_s16le",
+        "-c:a", "aac",
+        "-b:a", AUDIO_BITRATE,
         str(out_path),
     ]
     try:
@@ -392,6 +391,9 @@ def _enhance_video_with_realesrgan(
 ) -> Path:
     """Use Real-ESRGAN AnimeVideo-v3 to create a detailed 1080p video source.
 
+    Encodes with closed-GOP, no B-frames, and standard pixel format so that the
+    output video can be looped instantly via stream copy without re-encoding.
+
     Args:
         video_path: Low-resolution source video.
         out_path: Destination for the enhanced 1080p video.
@@ -410,8 +412,8 @@ def _enhance_video_with_realesrgan(
 
     frames_dir = out_path.parent / "realesrgan_frames"
     enhanced_frames_dir = out_path.parent / "realesrgan_enhanced_frames"
-    frames_dir.mkdir()
-    enhanced_frames_dir.mkdir()
+    frames_dir.mkdir(exist_ok=True)
+    enhanced_frames_dir.mkdir(exist_ok=True)
 
     print("      AI enhancing frames with Real-ESRGAN AnimeVideo-v3 (RTX 4060)...")
     extract_cmd = [
@@ -456,6 +458,9 @@ def _enhance_video_with_realesrgan(
             "-rc", "vbr",
             "-b:v", "0",
             "-gpu", "0",
+            "-g", "30",
+            "-bf", "0",
+            "-pix_fmt", "yuv420p",
         ]
     else:
         rebuild_cmd += [
@@ -463,6 +468,9 @@ def _enhance_video_with_realesrgan(
             "-preset", "slow",
             "-crf", "15",
             "-threads", str(CPU_THREADS),
+            "-g", "30",
+            "-bf", "0",
+            "-pix_fmt", "yuv420p",
         ]
     rebuild_cmd.append(str(out_path))
     _run_ffmpeg_with_progress(rebuild_cmd, duration, "      Encoding enhanced 1080p video")
@@ -477,9 +485,8 @@ def _upscale_video_to_1080p(
 ) -> Path:
     """Upscale video to 1080p if its resolution is below 1080p.
 
-    If the video is already 1080p (or higher), returns *video_path* unchanged.
-    Otherwise, scales the video to 1080p (1920x1080 for landscape, 1080x1920 for portrait)
-    using high-quality Lanczos resampling and a centered crop to fill the frame, saving to *out_path*.
+    Encodes with closed-GOP, no B-frames, and standard pixel format so that the
+    output video can be looped instantly via stream copy without re-encoding.
 
     Args:
         video_path: Source input video file.
@@ -520,6 +527,9 @@ def _upscale_video_to_1080p(
             "-rc", "vbr",
             "-b:v", "0",
             "-gpu", "0",
+            "-g", "30",
+            "-bf", "0",
+            "-pix_fmt", "yuv420p",
         ]
     else:
         cmd += [
@@ -527,6 +537,9 @@ def _upscale_video_to_1080p(
             "-preset", "slow",
             "-crf", "18",
             "-threads", str(CPU_THREADS),
+            "-g", "30",
+            "-bf", "0",
+            "-pix_fmt", "yuv420p",
         ]
 
     cmd += [
@@ -566,9 +579,8 @@ def _find_input_video(input_dir: Path) -> Path:
     return mp4_files[0]
 
 
-
 def _remux_to_ts(video_mp4: Path, out_ts: Path) -> Path:
-    """Remux MP4 to MPEG-TS container without re-encoding.
+    """Remux MP4 to MPEG-TS container with Annex-B bitstream without re-encoding.
 
     MPEG-TS has no index/moov atoms, allowing ffmpeg's ``-stream_loop -1``
     to loop infinitely in stream-copy mode without hanging on virtual index allocation.
@@ -585,6 +597,7 @@ def _remux_to_ts(video_mp4: Path, out_ts: Path) -> Path:
         "-y",
         "-i", str(video_mp4),
         "-c:v", "copy",
+        "-bsf:v", "h264_mp4toannexb",
         "-an",
         str(out_ts),
     ]
@@ -600,12 +613,12 @@ def _build_video_cmd(
 ) -> list[str]:
     """Build the ffmpeg command that loops the TS video and merges audio via stream copy.
 
-    Uses native ``-stream_loop -1`` on MPEG-TS and ``-c:v copy`` so the pre-upscaled 1080p video
-    is muxed directly with AAC audio at disk speed without re-encoding frames or demuxer hangs.
+    Uses native ``-stream_loop -1`` on MPEG-TS and ``-c:v copy -c:a copy`` so the pre-upscaled 1080p video
+    is muxed directly with pre-concatenated AAC audio at disk speed without re-encoding frames or demuxer hangs.
 
     Args:
         video_ts: MPEG-TS video clip to loop.
-        audio: Concatenated audio WAV file.
+        audio: Concatenated AAC audio file.
         out_path: Final output MP4 path.
         total_seconds: Target duration (audio length).
 
@@ -622,78 +635,13 @@ def _build_video_cmd(
         "-map", "0:v:0",
         "-map", "1:a:0",
         "-c:v", "copy",
-        "-c:a", "aac",
-        "-q:a", AUDIO_QUALITY,
+        "-c:a", "copy",
         "-t", str(total_seconds),
         "-shortest",
         "-movflags", "+faststart",
         str(out_path),
     ]
     return cmd
-
-
-def _build_frame_accurate_video_cmd(
-    video: Path,
-    audio: Path,
-    out_path: Path,
-    total_seconds: float,
-    encoder: str,
-    frame_rate: str,
-) -> list[str]:
-    """Build an ffmpeg command that loops and re-encodes an AI-enhanced source.
-
-    Re-encoding preserves a constant frame rate across loop boundaries. This
-    avoids MPEG-TS timestamp gaps that can occur with B-frames in a copied
-    Real-ESRGAN source stream.
-
-    Args:
-        video: Enhanced MP4 source clip.
-        audio: Concatenated WAV audio.
-        out_path: Destination MP4 path.
-        total_seconds: Target output duration.
-        encoder: Video encoder to use.
-        frame_rate: Constant output frame rate accepted by ffmpeg.
-
-    Returns:
-        Full ffmpeg command line.
-    """
-    cmd = [
-        "ffmpeg",
-        "-y",
-        "-threads", str(CPU_THREADS),
-        "-stream_loop", "-1",
-        "-i", str(video),
-        "-i", str(audio),
-        "-map", "0:v:0",
-        "-map", "1:a:0",
-        "-r", frame_rate,
-        "-fps_mode", "cfr",
-    ]
-    if "nvenc" in encoder:
-        cmd += [
-            "-c:v", encoder,
-            "-preset", "p5",
-            "-tune", NVENC_TUNE,
-            "-cq", "16",
-            "-rc", "vbr",
-            "-b:v", "0",
-            "-gpu", "0",
-        ]
-    else:
-        cmd += [
-            "-c:v", "libx264",
-            "-preset", "slow",
-            "-crf", "16",
-            "-threads", str(CPU_THREADS),
-        ]
-    return cmd + [
-        "-c:a", "aac",
-        "-q:a", AUDIO_QUALITY,
-        "-t", str(total_seconds),
-        "-shortest",
-        "-movflags", "+faststart",
-        str(out_path),
-    ]
 
 
 def _parse_time_str(time_str: str) -> float | None:
@@ -730,6 +678,8 @@ def _progress_target(processed_seconds: float, total_seconds: float) -> float:
 def _run_ffmpeg_with_progress(cmd: list[str], total_seconds: float, desc: str) -> None:
     """Run an ffmpeg command while streaming progress to a tqdm progress bar.
 
+    Uses a bounded ring buffer for stderr to prevent unbounded memory growth on long runs.
+
     Args:
         cmd: Full ffmpeg command list.
         total_seconds: Target duration in seconds for progress calculation.
@@ -748,12 +698,13 @@ def _run_ffmpeg_with_progress(cmd: list[str], total_seconds: float, desc: str) -
         encoding="utf-8",
         errors="replace",
     )
-    stderr_parts: list[str] = []
+    stderr_lines: deque[str] = deque(maxlen=100)
 
     def _drain_stderr() -> None:
-        """Consume ffmpeg diagnostics so its stderr pipe cannot block the process."""
+        """Consume ffmpeg diagnostics with a bounded ring-buffer to prevent memory leaks."""
         if proc.stderr:
-            stderr_parts.append(proc.stderr.read())
+            for line in proc.stderr:
+                stderr_lines.append(line)
 
     stderr_thread = threading.Thread(target=_drain_stderr, daemon=True)
     stderr_thread.start()
@@ -825,7 +776,7 @@ def _run_ffmpeg_with_progress(cmd: list[str], total_seconds: float, desc: str) -
         if proc.returncode == 0 and pbar.n < progress_total:
             pbar.update(progress_total - pbar.n)
 
-    stderr_output = "".join(stderr_parts)
+    stderr_output = "".join(stderr_lines)
     if proc.returncode != 0:
         raise RuntimeError(f"{desc.strip()} failed (exit code {proc.returncode}):\n{stderr_output.strip()}")
 
@@ -873,8 +824,8 @@ def main() -> None:
             )
             print("  >> Update driver: https://www.nvidia.com/Download/index.aspx")
         else:
-            print("  GPU encoder : not detected -- using libx264 ultrafast")
-        print("  CPU encoder : libx264 ultrafast (16 threads, i9-14HX)")
+            print("  GPU encoder : not detected -- using libx264")
+        print("  CPU encoder : libx264 (16 threads, i9-14HX)")
 
     # 1. Collect MP3s & probe files
     print(f"\n[1/4] Scanning for MP3 files in:\n      {GRADIO_OUTPUTS_DIR}")
@@ -905,7 +856,7 @@ def main() -> None:
         tmp_path = Path(tmp)
         upscaled_video = tmp_path / f"upscaled_1080p_{input_video.name}"
         enhanced_video = tmp_path / f"enhanced_1080p_{input_video.name}"
-        concat_wav = tmp_path / "concat_audio.wav"
+        concat_audio_path = tmp_path / "concat_audio.m4a"
 
         # 2. Upscale input video to 1080p if needed
         print("\n[2/4] Enhancing input video to 1080p (if needed)...")
@@ -928,48 +879,31 @@ def main() -> None:
         # 3. Concatenate audio
         print(f"\n[3/4] Concatenating {len(mp3_files)} audio file(s) ({_format_seconds(total_mp3_duration)} total)...")
         t1 = time.perf_counter()
-        total_duration = _concat_audio(mp3_files, concat_wav, expected_duration=total_mp3_duration)
+        total_duration = _concat_audio(mp3_files, concat_audio_path, expected_duration=total_mp3_duration)
         print(f"      Done in {time.perf_counter() - t1:.1f}s")
 
         # 4. Loop video + merge audio in ONE fast stream-copy pass
         final_output = OUTPUT_DIR / f"{timestamp}_final.mp4"
-        ai_enhancement_used = ai_enhanced_video != input_video
-        ready_frame_rate = _probe_frame_rate(ready_video)
-        loop_mode = "frame-accurate encode" if ai_enhancement_used else "stream copy - zero re-encode"
-        print(f"\n[4/4] Loop video ({_format_seconds(video_duration)} x~{plays}) + merge audio ({loop_mode})")
+        print(f"\n[4/4] Loop video ({_format_seconds(video_duration)} x~{plays}) + merge audio (stream copy - zero re-encode)")
         print(f"      Source video : {ready_video.name}")
-        if ai_enhancement_used:
-            print(f"      Video stream : {encoder} (constant {ready_frame_rate} fps)")
-        else:
-            print("      Video stream : copy (lossless, instant via MPEG-TS)")
-        print(f"      Audio codec  : aac (VBR q={AUDIO_QUALITY})")
+        print("      Video stream : copy (lossless, instant via MPEG-TS)")
+        print(f"      Audio stream : copy (AAC {AUDIO_BITRATE})")
         print(f"      Output       : {final_output.name}")
 
         t2 = time.perf_counter()
-        if ai_enhancement_used:
-            cmd = _build_frame_accurate_video_cmd(
-                video=ready_video,
-                audio=concat_wav,
-                out_path=final_output,
-                total_seconds=total_duration,
-                encoder=encoder,
-                frame_rate=ready_frame_rate,
-            )
-        else:
-            # Convert short video to TS container to avoid MP4 moov index pre-allocation hang.
-            loop_ts = tmp_path / "loop_source.ts"
-            _remux_to_ts(ready_video, loop_ts)
-            cmd = _build_video_cmd(
-                video_ts=loop_ts,
-                audio=concat_wav,
-                out_path=final_output,
-                total_seconds=total_duration,
-            )
+        loop_ts = tmp_path / "loop_source.ts"
+        _remux_to_ts(ready_video, loop_ts)
+        cmd = _build_video_cmd(
+            video_ts=loop_ts,
+            audio=concat_audio_path,
+            out_path=final_output,
+            total_seconds=total_duration,
+        )
 
         _run_ffmpeg_with_progress(
             cmd,
             total_seconds=total_duration,
-            desc="      Video encode & mux" if ai_enhancement_used else "      Video stream copy & mux",
+            desc="      Video stream copy & mux",
         )
 
         encode_secs = time.perf_counter() - t2
@@ -990,4 +924,3 @@ if __name__ == "__main__":
     except (FileNotFoundError, RuntimeError) as exc:
         print(f"\n[ERROR] {exc}", file=sys.stderr)
         sys.exit(1)
-
