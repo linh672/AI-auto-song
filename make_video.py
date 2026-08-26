@@ -25,9 +25,12 @@ Encoder selection (auto-detected at runtime)
 Optimisations applied
 ----------------------
 - Parallel ffprobe calls (ThreadPoolExecutor, up to CPU_THREADS workers).
+- Resolution pre-check before AI upscale: skips Real-ESRGAN frame extraction when source is already >= 1080p.
 - Upscale the short input video ONCE before looping using NVENC/libx264 with closed GOP and no B-frames.
 - Stream-copy looped video (-c:v copy with -stream_loop -1 via MPEG-TS) to mux 4+ hours in seconds without re-encoding.
-- Stream-copy audio (-c:a copy from pre-concatenated AAC track).
+- Audio fast path: when all MP3s share the same codec/sample-rate/channels, they are concatenated via
+  a single lossless stream-copy pass (~2s instead of ~11 minutes of AAC transcoding).
+- Fallback path: parallel AAC transcode across CPU_THREADS workers, then lossless chunk concat.
 - Bounded stderr ring buffer in progress monitoring to prevent memory leaks during long renders.
 - NVENC pre-check via ``nvidia-smi`` driver version before attempting upscale encode.
 - ``-threads`` tuned for i9-14HX P-core count.
@@ -238,58 +241,146 @@ def _format_seconds(seconds: float) -> str:
     return f"{mins}m {secs:02d}s"
 
 
-def _concat_audio(
-    mp3_files: list[Path],
-    out_path: Path,
-    expected_duration: float | None = None,
-) -> float:
-    """Concatenate *mp3_files* into a single AAC M4A file at *out_path*.
-
-    Uses ffmpeg concat demuxer with ``-threads`` set to ``CPU_THREADS`` so the
-    MP3 decoder can use multiple threads for the decode pass.
+def _probe_audio_properties(path: Path) -> tuple[str, str, str]:
+    """Return (codec_name, sample_rate, channels) for primary audio stream.
 
     Args:
-        mp3_files: Ordered list of MP3 paths to concatenate.
-        out_path: Destination AAC M4A file path.
-        expected_duration: Optional total expected duration in seconds for progress bar.
+        path: Path to audio file.
 
     Returns:
-        Total duration of the concatenated audio in seconds.
+        Tuple of (codec_name, sample_rate, channels).
     """
-    list_file = out_path.with_suffix(".txt")
-    with list_file.open("w", encoding="utf-8") as fh:
-        for mp3 in mp3_files:
-            safe = str(mp3).replace("\\", "/")
-            fh.write(f"file '{safe}'\n")
+    cmd = [
+        "ffprobe",
+        "-v", "error",
+        "-select_streams", "a:0",
+        "-show_entries", "stream=codec_name,sample_rate,channels",
+        "-of", "csv=s=x:p=0",
+        str(path),
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        return ("", "", "")
+    parts = result.stdout.strip().split("x")
+    if len(parts) == 3:
+        return (parts[0], parts[1], parts[2])
+    return ("", "", "")
 
+
+def _transcode_audio_chunk(src: Path, dst: Path) -> None:
+    """Transcode a single audio file to AAC chunk in a worker thread.
+
+    Args:
+        src: Input audio file path.
+        dst: Output AAC audio file path.
+    """
     cmd = [
         "ffmpeg",
         "-y",
-        "-threads", str(CPU_THREADS),
-        "-f", "concat",
-        "-safe", "0",
-        "-i", str(list_file),
+        "-v", "error",
+        "-i", str(src),
         "-ar", "44100",
         "-ac", "2",
         "-c:a", "aac",
         "-b:a", AUDIO_BITRATE,
-        str(out_path),
+        str(dst),
     ]
-    try:
-        if expected_duration and expected_duration > 0:
-            _run_ffmpeg_with_progress(
-                cmd,
-                total_seconds=expected_duration,
-                desc="      Audio concat",
-            )
-        else:
-            _run_ffmpeg(cmd, "Audio concat")
-    finally:
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to transcode {src.name}:\n{result.stderr.strip()}")
+
+
+def _concat_audio(
+    mp3_files: list[Path],
+    out_dir: Path,
+    expected_duration: float | None = None,
+) -> tuple[float, Path, str]:
+    """Concatenate *mp3_files* into a single audio file with maximum efficiency.
+
+    If all files share the same audio codec, sample rate, and channels, performs
+    an instantaneous lossless stream copy (takes ~1-2s). If files have mixed formats,
+    transcodes them concurrently across CPU threads before concatenating.
+
+    Args:
+        mp3_files: Ordered list of audio paths to concatenate.
+        out_dir: Directory for temporary and output audio files.
+        expected_duration: Optional total expected duration in seconds.
+
+    Returns:
+        Tuple of (total_duration_seconds, output_audio_path, codec_description).
+    """
+    # Probe audio properties of first file and check consistency
+    first_props = _probe_audio_properties(mp3_files[0])
+    all_same = True
+    if len(mp3_files) > 1:
+        with ThreadPoolExecutor(max_workers=min(len(mp3_files), CPU_THREADS)) as pool:
+            props_list = list(pool.map(_probe_audio_properties, mp3_files))
+        all_same = all(p == first_props and p[0] != "" for p in props_list)
+
+    if all_same and first_props[0] in {"mp3", "aac", "m4a"}:
+        # Fast path: 100% Lossless stream-copy concat (zero re-encode, ~1-2s)
+        codec = first_props[0]
+        ext = "mp3" if codec == "mp3" else "m4a"
+        out_path = out_dir / f"concat_audio.{ext}"
+        list_file = out_dir / "audio_list.txt"
+        with list_file.open("w", encoding="utf-8") as fh:
+            for f in mp3_files:
+                safe = str(f.resolve()).replace("\\", "/")
+                fh.write(f"file '{safe}'\n")
+
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", str(list_file),
+            "-c", "copy",
+            str(out_path),
+        ]
+        _run_ffmpeg(cmd, "Lossless audio stream concat")
         list_file.unlink(missing_ok=True)
+        codec_desc = f"{codec.upper()} (lossless copy, zero re-encode)"
+    else:
+        # Parallel transcode path: transcode chunks across all CPU cores
+        print(f"      Parallel transcoding {len(mp3_files)} chunks across {CPU_THREADS} workers...")
+        chunks_dir = out_dir / "audio_chunks"
+        chunks_dir.mkdir(exist_ok=True)
+        chunk_paths: list[Path] = []
+
+        tasks = []
+        for i, src in enumerate(mp3_files):
+            dst = chunks_dir / f"chunk_{i:05d}.m4a"
+            chunk_paths.append(dst)
+            tasks.append((src, dst))
+
+        with ThreadPoolExecutor(max_workers=CPU_THREADS) as pool:
+            futures = [pool.submit(_transcode_audio_chunk, s, d) for s, d in tasks]
+            for future in as_completed(futures):
+                future.result()
+
+        out_path = out_dir / "concat_audio.m4a"
+        list_file = out_dir / "audio_chunks_list.txt"
+        with list_file.open("w", encoding="utf-8") as fh:
+            for chunk in chunk_paths:
+                safe = str(chunk.resolve()).replace("\\", "/")
+                fh.write(f"file '{safe}'\n")
+
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", str(list_file),
+            "-c", "copy",
+            str(out_path),
+        ]
+        _run_ffmpeg(cmd, "Concatenating AAC chunks")
+        list_file.unlink(missing_ok=True)
+        codec_desc = f"AAC {AUDIO_BITRATE}"
 
     duration = _probe_duration(out_path)
     print(f"      Total audio duration: {_format_seconds(duration)}  ({duration:.2f}s)")
-    return duration
+    return duration, out_path, codec_desc
 
 
 def _probe_resolution(path: Path) -> tuple[int, int]:
@@ -408,6 +499,13 @@ def _enhance_video_with_realesrgan(
         return video_path
     if not REAL_ESRGAN_EXECUTABLE.is_file():
         print("      Real-ESRGAN is unavailable -- using Lanczos fallback.")
+        return video_path
+
+    width, height = _probe_resolution(video_path)
+    is_portrait = height > width
+    target_w, target_h = (1080, 1920) if is_portrait else (1920, 1080)
+    if width >= target_w and height >= target_h:
+        print(f"      Source video is already {width}x{height} (>= 1080p) -- skipping AI enhancement.")
         return video_path
 
     frames_dir = out_path.parent / "realesrgan_frames"
@@ -856,7 +954,6 @@ def main() -> None:
         tmp_path = Path(tmp)
         upscaled_video = tmp_path / f"upscaled_1080p_{input_video.name}"
         enhanced_video = tmp_path / f"enhanced_1080p_{input_video.name}"
-        concat_audio_path = tmp_path / "concat_audio.m4a"
 
         # 2. Upscale input video to 1080p if needed
         print("\n[2/4] Enhancing input video to 1080p (if needed)...")
@@ -879,7 +976,9 @@ def main() -> None:
         # 3. Concatenate audio
         print(f"\n[3/4] Concatenating {len(mp3_files)} audio file(s) ({_format_seconds(total_mp3_duration)} total)...")
         t1 = time.perf_counter()
-        total_duration = _concat_audio(mp3_files, concat_audio_path, expected_duration=total_mp3_duration)
+        total_duration, concat_audio_path, audio_codec_desc = _concat_audio(
+            mp3_files, tmp_path, expected_duration=total_mp3_duration
+        )
         print(f"      Done in {time.perf_counter() - t1:.1f}s")
 
         # 4. Loop video + merge audio in ONE fast stream-copy pass
@@ -887,7 +986,7 @@ def main() -> None:
         print(f"\n[4/4] Loop video ({_format_seconds(video_duration)} x~{plays}) + merge audio (stream copy - zero re-encode)")
         print(f"      Source video : {ready_video.name}")
         print("      Video stream : copy (lossless, instant via MPEG-TS)")
-        print(f"      Audio stream : copy (AAC {AUDIO_BITRATE})")
+        print(f"      Audio stream : copy ({audio_codec_desc})")
         print(f"      Output       : {final_output.name}")
 
         t2 = time.perf_counter()
