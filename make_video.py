@@ -89,7 +89,7 @@ AUDIO_BITRATE = "320k"
 # 'fast'    -> CPU 2D-FFT Butterworth notch (~18ms/frame)
 # 'paranoid'-> GPU SDXL-Turbo + ControlNet Canny diffusion pass (~3.2s/frame)
 # 'off'     -> Skip frame-level cleaning (metadata strip only)
-WATERMARK_CLEAN_MODE = os.environ.get("ACE_STEP_CLEAN_MODE", "fast")
+WATERMARK_CLEAN_MODE = os.environ.get("ACE_STEP_CLEAN_MODE", "paranoid")
 
 # AI enhancement is enabled automatically when the bundled Real-ESRGAN executable exists.
 # Set ACE_STEP_AI_UPSCALE=0 to use the faster Lanczos-only fallback.
@@ -979,19 +979,6 @@ def main() -> None:
         mode = WATERMARK_CLEAN_MODE.lower()
         print(f"\n[3/6] Mitigating AI watermarks (mode: {mode.upper()})...")
         if mode != "off":
-            # Auto-fallback: If Real-ESRGAN will re-render all frames, PARANOID diffusion is redundant
-            w, h = _probe_resolution(input_video)
-            target_w, target_h = (1080, 1920) if h > w else (1920, 1080)
-            esrgan_will_run = (
-                AI_UPSCALE_ENABLED
-                and REAL_ESRGAN_EXECUTABLE.is_file()
-                and (w < target_w or h < target_h)
-            )
-            if mode == "paranoid" and esrgan_will_run:
-                print("      Real-ESRGAN is enabled and will reconstruct all pixels from scratch.")
-                print("      Auto-switching PARANOID -> FAST mode to avoid redundant diffusion pass.")
-                mode = "fast"
-
             t_clean = time.perf_counter()
             clean_stage_video = deep_clean_frames(
                 video_path=clean_stage_video,
