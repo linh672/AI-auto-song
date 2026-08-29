@@ -36,7 +36,7 @@ from __future__ import annotations
 import os
 import subprocess
 import tempfile
-from math import isfinite
+from math import ceil, isfinite
 from pathlib import Path
 
 import cv2
@@ -64,19 +64,20 @@ _CPU_THREADS: int = 16
 # ---------------------------------------------------------------------------
 
 
-def _effective_denoise_strength(strength: float, num_inference_steps: int) -> float:
-    """Return a valid img2img strength that schedules at least one denoising step.
+def _effective_inference_steps(strength: float, num_inference_steps: int) -> int:
+    """Return enough scheduler steps to run one pass at the requested strength.
 
     Diffusers truncates ``num_inference_steps * strength`` to an integer.  A
     strength below ``1 / num_inference_steps`` would otherwise select zero
-    timesteps and fail before a frame can be rendered.
+    timesteps and fail before a frame can be rendered.  Increasing scheduler
+    steps preserves the requested low-noise strength, unlike raising it.
 
     Args:
         strength: Requested img2img denoise strength, from zero to one.
         num_inference_steps: Number of scheduler inference steps.
 
     Returns:
-        The requested strength, raised only when necessary to schedule one step.
+        Scheduler step count that schedules at least one denoising timestep.
 
     Raises:
         ValueError: If the strength or number of inference steps is invalid.
@@ -85,7 +86,7 @@ def _effective_denoise_strength(strength: float, num_inference_steps: int) -> fl
         raise ValueError("ACE_STEP_DENOISE must be greater than 0 and at most 1.")
     if num_inference_steps < 1:
         raise ValueError("Diffusion inference steps must be at least 1.")
-    return max(strength, 1.0 / num_inference_steps)
+    return max(num_inference_steps, ceil(1.0 / strength))
 
 
 def _load_pipeline():
@@ -142,6 +143,7 @@ def _run_diffusion_frame(
     frame_rgb: np.ndarray,
     canny_rgb: np.ndarray,
     strength: float,
+    num_inference_steps: int,
 ) -> np.ndarray:
     """Run a single SDXL-Turbo img2img pass on one RGB frame.
 
@@ -154,6 +156,7 @@ def _run_diffusion_frame(
         frame_rgb: uint8 (H, W, 3) RGB frame.
         canny_rgb: uint8 (H, W, 3) Canny edge map (same spatial dimensions).
         strength: Valid denoise strength that schedules at least one timestep.
+        num_inference_steps: Scheduler steps required for the supplied strength.
 
     Returns:
         Cleaned uint8 (H, W, 3) RGB frame.
@@ -167,7 +170,7 @@ def _run_diffusion_frame(
             image=Image.fromarray(frame_rgb),
             control_image=Image.fromarray(canny_rgb),
             strength=strength,
-            num_inference_steps=_DIFFUSION_STEPS,
+            num_inference_steps=num_inference_steps,
             guidance_scale=_GUIDANCE_SCALE,
             controlnet_conditioning_scale=_CONTROLNET_SCALE,
             output_type="np",
@@ -273,13 +276,16 @@ def diffusion_clean(
     Raises:
         RuntimeError: If CUDA is unavailable or any pipeline step fails.
     """
-    strength = _effective_denoise_strength(_DENOISE_STRENGTH, _DIFFUSION_STEPS)
-    if strength != _DENOISE_STRENGTH:
+    num_inference_steps = _effective_inference_steps(
+        _DENOISE_STRENGTH,
+        _DIFFUSION_STEPS,
+    )
+    if num_inference_steps != _DIFFUSION_STEPS:
         logger.warning(
-            "Raising denoise strength from {} to {} so {} diffusion step(s) render a frame.",
-            _DENOISE_STRENGTH,
-            strength,
+            "Raising scheduler steps from {} to {} so denoise strength {} renders a frame.",
             _DIFFUSION_STEPS,
+            num_inference_steps,
+            _DENOISE_STRENGTH,
         )
     pipe = _load_pipeline()
 
@@ -308,7 +314,10 @@ def diffusion_clean(
 
             logger.info(
                 "Diffusion re-render: {} frames, denoise={}, steps={}, {:.0f}s source",
-                len(frame_paths), _DENOISE_STRENGTH, _DIFFUSION_STEPS, duration,
+                len(frame_paths),
+                _DENOISE_STRENGTH,
+                num_inference_steps,
+                duration,
             )
 
             for i, fp in enumerate(frame_paths):
@@ -318,7 +327,13 @@ def diffusion_clean(
                 edges = cv2.Canny(gray, threshold1=_CANNY_LOW, threshold2=_CANNY_HIGH)
                 canny_rgb = cv2.cvtColor(edges, cv2.COLOR_GRAY2RGB)
 
-                cleaned_rgb = _run_diffusion_frame(pipe, rgb, canny_rgb, strength)
+                cleaned_rgb = _run_diffusion_frame(
+                    pipe,
+                    rgb,
+                    canny_rgb,
+                    _DENOISE_STRENGTH,
+                    num_inference_steps,
+                )
                 cleaned_bgr = cv2.cvtColor(cleaned_rgb, cv2.COLOR_RGB2BGR)
                 cv2.imwrite(
                     str(clean_dir / fp.name), cleaned_bgr,

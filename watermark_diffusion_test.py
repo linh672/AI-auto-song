@@ -2,22 +2,21 @@
 
 import unittest
 
-from watermark_diffusion import _effective_denoise_strength
+from watermark_diffusion import _effective_inference_steps
 
 
-class TestEffectiveDenoiseStrength(unittest.TestCase):
-    """Verify Diffusers always receives at least one denoising timestep."""
+class TestEffectiveInferenceSteps(unittest.TestCase):
+    """Verify Diffusers schedules work without raising the denoise strength."""
 
-    def test_raises_strength_to_one_step_minimum(self) -> None:
-        """A low strength with two steps must still run one denoising step."""
-        self.assertEqual(_effective_denoise_strength(0.10, 2), 0.5)
+    def test_raises_scheduler_steps_for_low_denoise(self) -> None:
+        """A low strength must use enough scheduler steps to run one pass."""
+        self.assertEqual(_effective_inference_steps(0.10, 2), 10)
 
-    def test_preserves_strength_that_already_runs(self) -> None:
-        """A strength that schedules work is not changed."""
-        self.assertEqual(_effective_denoise_strength(0.75, 2), 0.75)
+    def test_preserves_sufficient_scheduler_steps(self) -> None:
+        """Existing steps remain unchanged when they already schedule work."""
+        self.assertEqual(_effective_inference_steps(0.75, 2), 2)
 
     def test_rejects_invalid_strength(self) -> None:
         """Zero strength cannot produce an img2img denoising schedule."""
         with self.assertRaises(ValueError):
-            _effective_denoise_strength(0.0, 2)
-
+            _effective_inference_steps(0.0, 2)
