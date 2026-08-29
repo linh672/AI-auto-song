@@ -110,11 +110,23 @@ def _blend_with_source_frame(
     Returns:
         A uint8 RGB frame blended with the original source.
 
+    The SDXL pipeline may resize a frame to a model-compatible resolution.
+    Resize its result back to the source dimensions before blending so the
+    rebuilt video preserves the original resolution.
+
     Raises:
-        ValueError: If the frames do not match or the weight is invalid.
+        ValueError: If the frame channel counts differ or the weight is invalid.
     """
-    if source_rgb.shape != diffused_rgb.shape:
-        raise ValueError("Source and diffusion frames must have matching shapes.")
+    if source_rgb.ndim != 3 or diffused_rgb.ndim != 3:
+        raise ValueError("Source and diffusion frames must be three-dimensional RGB arrays.")
+    if source_rgb.shape[2] != diffused_rgb.shape[2]:
+        raise ValueError("Source and diffusion frames must have matching channel counts.")
+    if source_rgb.shape[:2] != diffused_rgb.shape[:2]:
+        diffused_rgb = cv2.resize(
+            diffused_rgb,
+            (source_rgb.shape[1], source_rgb.shape[0]),
+            interpolation=cv2.INTER_LANCZOS4,
+        )
     _validate_diffusion_blend(diffusion_weight)
     return cv2.addWeighted(
         source_rgb,

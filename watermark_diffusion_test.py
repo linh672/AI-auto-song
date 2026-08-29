@@ -52,9 +52,17 @@ class TestBlendWithSourceFrame(unittest.TestCase):
         result = _blend_with_source_frame(source, diffused, 0.15)
         np.testing.assert_array_equal(result, np.full((2, 2, 3), 60, dtype=np.uint8))
 
-    def test_rejects_mismatched_frame_shapes(self) -> None:
-        """Frames with different dimensions cannot be blended safely."""
+    def test_resizes_diffusion_frame_before_blending(self) -> None:
+        """A model-resized output must be restored to the source dimensions."""
+        source = np.zeros((4, 6, 3), dtype=np.uint8)
+        diffused = np.full((2, 3, 3), 200, dtype=np.uint8)
+        result = _blend_with_source_frame(source, diffused, 1.0)
+        self.assertEqual(result.shape, source.shape)
+        np.testing.assert_array_equal(result, np.full(source.shape, 200, dtype=np.uint8))
+
+    def test_rejects_mismatched_frame_channel_counts(self) -> None:
+        """Frames with different channel counts cannot be blended safely."""
         source = np.zeros((2, 2, 3), dtype=np.uint8)
-        diffused = np.zeros((3, 2, 3), dtype=np.uint8)
+        diffused = np.zeros((2, 2, 1), dtype=np.uint8)
         with self.assertRaises(ValueError):
             _blend_with_source_frame(source, diffused, 0.15)
