@@ -50,6 +50,7 @@ _DENOISE_STRENGTH: float = float(os.environ.get("ACE_STEP_DENOISE", "0.10"))
 _DIFFUSION_STEPS: int = 2          # SDXL-Turbo: 1–4 steps recommended
 _GUIDANCE_SCALE: float = 0.0       # Turbo uses classifier-free guidance = 0
 _CONTROLNET_SCALE: float = 0.55    # ControlNet conditioning strength
+_DIFFUSION_BLEND: float = float(os.environ.get("ACE_STEP_DIFFUSION_BLEND", "0.15"))
 
 _SDXL_TURBO_REPO: str = "stabilityai/sdxl-turbo"
 _CONTROLNET_REPO: str = "diffusers/controlnet-canny-sdxl-1.0"
@@ -87,6 +88,47 @@ def _effective_inference_steps(strength: float, num_inference_steps: int) -> int
     if num_inference_steps < 1:
         raise ValueError("Diffusion inference steps must be at least 1.")
     return max(num_inference_steps, ceil(1.0 / strength))
+
+
+def _blend_with_source_frame(
+    source_rgb: np.ndarray,
+    diffused_rgb: np.ndarray,
+    diffusion_weight: float,
+) -> np.ndarray:
+    """Anchor a re-rendered frame to its source frame to preserve motion.
+
+    Each SDXL invocation is independent, so direct frame replacement can
+    introduce temporal flicker.  A source-weighted blend retains the original
+    frame-to-frame motion while retaining a controlled portion of the
+    diffusion re-render.
+
+    Args:
+        source_rgb: Original uint8 RGB frame.
+        diffused_rgb: Diffusion-rendered uint8 RGB frame of the same shape.
+        diffusion_weight: Contribution of the diffusion frame, from zero to one.
+
+    Returns:
+        A uint8 RGB frame blended with the original source.
+
+    Raises:
+        ValueError: If the frames do not match or the weight is invalid.
+    """
+    if source_rgb.shape != diffused_rgb.shape:
+        raise ValueError("Source and diffusion frames must have matching shapes.")
+    _validate_diffusion_blend(diffusion_weight)
+    return cv2.addWeighted(
+        source_rgb,
+        1.0 - diffusion_weight,
+        diffused_rgb,
+        diffusion_weight,
+        0,
+    )
+
+
+def _validate_diffusion_blend(diffusion_weight: float) -> None:
+    """Raise an error when a diffusion blend weight is outside its valid range."""
+    if not isfinite(diffusion_weight) or not 0.0 <= diffusion_weight <= 1.0:
+        raise ValueError("ACE_STEP_DIFFUSION_BLEND must be between 0 and 1.")
 
 
 def _load_pipeline():
@@ -280,6 +322,7 @@ def diffusion_clean(
         _DENOISE_STRENGTH,
         _DIFFUSION_STEPS,
     )
+    _validate_diffusion_blend(_DIFFUSION_BLEND)
     if num_inference_steps != _DIFFUSION_STEPS:
         logger.warning(
             "Raising scheduler steps from {} to {} so denoise strength {} renders a frame.",
@@ -313,10 +356,11 @@ def diffusion_clean(
                 raise RuntimeError("No frames extracted from video.")
 
             logger.info(
-                "Diffusion re-render: {} frames, denoise={}, steps={}, {:.0f}s source",
+                "Diffusion re-render: {} frames, denoise={}, steps={}, blend={}, {:.0f}s source",
                 len(frame_paths),
                 _DENOISE_STRENGTH,
                 num_inference_steps,
+                _DIFFUSION_BLEND,
                 duration,
             )
 
@@ -333,6 +377,11 @@ def diffusion_clean(
                     canny_rgb,
                     _DENOISE_STRENGTH,
                     num_inference_steps,
+                )
+                cleaned_rgb = _blend_with_source_frame(
+                    rgb,
+                    cleaned_rgb,
+                    _DIFFUSION_BLEND,
                 )
                 cleaned_bgr = cv2.cvtColor(cleaned_rgb, cv2.COLOR_RGB2BGR)
                 cv2.imwrite(
