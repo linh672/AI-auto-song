@@ -5,10 +5,12 @@ Workflow
 --------
 1. Scan ``gradio_outputs/`` recursively for every ``*.mp3`` file.
 2. Probe all MP3 durations and input video resolution in parallel.
-3. Upscale the input video in ``input/`` to 1080p if below 1080p (closed-GOP, no B-frames).
-4. Concatenate MP3s (in folder-name order) into a single AAC audio track.
-5. Loop-extend the 1080p video via MPEG-TS stream-copy to match audio duration.
-6. Merge the looped video with the concatenated audio (zero re-encode) and write
+3. Strip container-level AI metadata (C2PA, XMP, EXIF, mov provenance atoms).
+4. Mitigate deep AI watermarks (FAST: FFT notch / PARANOID: SDXL-Turbo diffusion).
+5. Upscale the input video in ``input/`` to 1080p if below 1080p (closed-GOP, no B-frames).
+6. Concatenate MP3s (in folder-name order) into a single AAC audio track.
+7. Loop-extend the 1080p video via MPEG-TS stream-copy to match audio duration.
+8. Merge the looped video with the concatenated audio (zero re-encode) and write
    the result to ``output/<timestamp>_final.mp4``.
 
 Hardware targets
@@ -25,6 +27,8 @@ Encoder selection (auto-detected at runtime)
 Optimisations applied
 ----------------------
 - Parallel ffprobe calls (ThreadPoolExecutor, up to CPU_THREADS workers).
+- Lossless container metadata strip (C2PA/XMP/EXIF zero re-encode).
+- CPU-parallel FFT notch filter (FAST) or VRAM-safe SDXL-Turbo diffusion pass (PARANOID).
 - Resolution pre-check before AI upscale: skips Real-ESRGAN frame extraction when source is already >= 1080p.
 - Upscale the short input video ONCE before looping using NVENC/libx264 with closed GOP and no B-frames.
 - Stream-copy looped video (-c:v copy with -stream_loop -1 via MPEG-TS) to mux 4+ hours in seconds without re-encoding.
@@ -37,7 +41,7 @@ Optimisations applied
 
 Dependencies
 ------------
-Only the standard library and **ffmpeg >= 6.0** (must be on PATH) are required.
+Standard library, **ffmpeg >= 6.0**, **numpy**, **scipy**, and optional **diffusers** (for PARANOID mode).
 """
 
 from __future__ import annotations
@@ -54,6 +58,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from tqdm import tqdm
+
+from watermark_clean import deep_clean_frames, strip_container_metadata
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -78,6 +84,12 @@ NVENC_CQ = "23"         # constant quality (0=best, 51=worst; ~18-28 is typical)
 
 # AAC audio bitrate for concatenated track (320k for pristine music quality)
 AUDIO_BITRATE = "320k"
+
+# Watermark Mitigation Mode
+# 'fast'    -> CPU 2D-FFT Butterworth notch (~18ms/frame)
+# 'paranoid'-> GPU SDXL-Turbo + ControlNet Canny diffusion pass (~3.2s/frame)
+# 'off'     -> Skip frame-level cleaning (metadata strip only)
+WATERMARK_CLEAN_MODE = os.environ.get("ACE_STEP_CLEAN_MODE", "fast")
 
 # AI enhancement is enabled automatically when the bundled Real-ESRGAN executable exists.
 # Set ACE_STEP_AI_UPSCALE=0 to use the faster Lanczos-only fallback.
@@ -900,7 +912,7 @@ def _run_ffmpeg(cmd: list[str], step_name: str) -> None:
 
 
 def main() -> None:
-    """Orchestrate parallel probe, upscale input video to 1080p, audio concat, GPU loop+merge into a final video."""
+    """Orchestrate parallel probe, watermark clean, upscale, audio concat, GPU loop+merge."""
     start_total_time = time.perf_counter()
     print("=" * 60)
     print("  ACE-Step - Draft Audio -> Video Builder  [GPU-optimised]")
@@ -926,7 +938,7 @@ def main() -> None:
         print("  CPU encoder : libx264 (16 threads, i9-14HX)")
 
     # 1. Collect MP3s & probe files
-    print(f"\n[1/4] Scanning for MP3 files in:\n      {GRADIO_OUTPUTS_DIR}")
+    print(f"\n[1/6] Scanning for MP3 files in:\n      {GRADIO_OUTPUTS_DIR}")
     mp3_files = _collect_mp3s(GRADIO_OUTPUTS_DIR)
 
     # Probe input video and all MP3s in PARALLEL
@@ -952,14 +964,51 @@ def main() -> None:
     timestamp = int(time.time())
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
+        meta_cleaned_video = tmp_path / f"meta_clean_{input_video.name}"
+        deep_cleaned_video = tmp_path / f"deep_clean_{input_video.name}"
         upscaled_video = tmp_path / f"upscaled_1080p_{input_video.name}"
         enhanced_video = tmp_path / f"enhanced_1080p_{input_video.name}"
 
-        # 2. Upscale input video to 1080p if needed
-        print("\n[2/4] Enhancing input video to 1080p (if needed)...")
+        # 2. Strip container metadata (C2PA / XMP / EXIF / atoms)
+        print("\n[2/6] Stripping container metadata (C2PA / XMP / provenance atoms)...")
+        t_meta = time.perf_counter()
+        clean_stage_video = strip_container_metadata(input_video, meta_cleaned_video)
+        print(f"      Metadata stripped in {time.perf_counter() - t_meta:.2f}s")
+
+        # 3. Deep AI watermark mitigation
+        mode = WATERMARK_CLEAN_MODE.lower()
+        print(f"\n[3/6] Mitigating AI watermarks (mode: {mode.upper()})...")
+        if mode != "off":
+            # Auto-fallback: If Real-ESRGAN will re-render all frames, PARANOID diffusion is redundant
+            w, h = _probe_resolution(input_video)
+            target_w, target_h = (1080, 1920) if h > w else (1920, 1080)
+            esrgan_will_run = (
+                AI_UPSCALE_ENABLED
+                and REAL_ESRGAN_EXECUTABLE.is_file()
+                and (w < target_w or h < target_h)
+            )
+            if mode == "paranoid" and esrgan_will_run:
+                print("      Real-ESRGAN is enabled and will reconstruct all pixels from scratch.")
+                print("      Auto-switching PARANOID -> FAST mode to avoid redundant diffusion pass.")
+                mode = "fast"
+
+            t_clean = time.perf_counter()
+            clean_stage_video = deep_clean_frames(
+                video_path=clean_stage_video,
+                out_path=deep_cleaned_video,
+                encoder=encoder,
+                duration=video_duration,
+                mode=mode,  # type: ignore[arg-type]
+            )
+            print(f"      Watermark cleaning finished in {time.perf_counter() - t_clean:.1f}s")
+        else:
+            print("      Frame-level watermark cleaning disabled (ACE_STEP_CLEAN_MODE=off).")
+
+        # 4. Enhance / upscale input video to 1080p if needed
+        print("\n[4/6] Enhancing input video to 1080p (if needed)...")
         t_up = time.perf_counter()
         ai_enhanced_video = _enhance_video_with_realesrgan(
-            video_path=input_video,
+            video_path=clean_stage_video,
             out_path=enhanced_video,
             encoder=encoder,
             duration=video_duration,
@@ -970,20 +1019,20 @@ def main() -> None:
             encoder=encoder,
             duration=video_duration,
         )
-        if ready_video != input_video:
+        if ready_video != clean_stage_video:
             print(f"      Video preparation finished in {time.perf_counter() - t_up:.1f}s")
 
-        # 3. Concatenate audio
-        print(f"\n[3/4] Concatenating {len(mp3_files)} audio file(s) ({_format_seconds(total_mp3_duration)} total)...")
+        # 5. Concatenate audio
+        print(f"\n[5/6] Concatenating {len(mp3_files)} audio file(s) ({_format_seconds(total_mp3_duration)} total)...")
         t1 = time.perf_counter()
         total_duration, concat_audio_path, audio_codec_desc = _concat_audio(
             mp3_files, tmp_path, expected_duration=total_mp3_duration
         )
         print(f"      Done in {time.perf_counter() - t1:.1f}s")
 
-        # 4. Loop video + merge audio in ONE fast stream-copy pass
+        # 6. Loop video + merge audio in ONE fast stream-copy pass
         final_output = OUTPUT_DIR / f"{timestamp}_final.mp4"
-        print(f"\n[4/4] Loop video ({_format_seconds(video_duration)} x~{plays}) + merge audio (stream copy - zero re-encode)")
+        print(f"\n[6/6] Loop video ({_format_seconds(video_duration)} x~{plays}) + merge audio (stream copy - zero re-encode)")
         print(f"      Source video : {ready_video.name}")
         print("      Video stream : copy (lossless, instant via MPEG-TS)")
         print(f"      Audio stream : copy ({audio_codec_desc})")
