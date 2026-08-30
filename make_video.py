@@ -6,7 +6,7 @@ Workflow
 1. Scan ``gradio_outputs/`` recursively for every ``*.mp3`` file.
 2. Probe all MP3 durations and input video resolution in parallel.
 3. Strip container-level AI metadata (C2PA, XMP, EXIF, mov provenance atoms).
-4. Mitigate deep AI watermarks (FAST: FFT notch / PARANOID: SDXL-Turbo diffusion).
+4. Remove supported visible marks and regenerate frames to mitigate SynthID.
 5. Upscale the input video in ``input/`` to 1080p if below 1080p (closed-GOP, no B-frames).
 6. Concatenate MP3s (in folder-name order) into a single AAC audio track.
 7. Loop-extend the 1080p video via MPEG-TS stream-copy to match audio duration.
@@ -59,7 +59,7 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from watermark_clean import deep_clean_frames, strip_container_metadata
+from watermark_clean import strip_container_metadata
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -85,13 +85,12 @@ NVENC_CQ = "23"         # constant quality (0=best, 51=worst; ~18-28 is typical)
 # AAC audio bitrate for concatenated track (320k for pristine music quality)
 AUDIO_BITRATE = "320k"
 
-# Watermark Mitigation Mode
-# 'fast'    -> CPU 2D-FFT Butterworth notch (~18ms/frame)
-# 'paranoid'-> GPU SDXL-Turbo + ControlNet Canny diffusion pass (~3.2s/frame)
-# 'off'     -> Skip frame-level cleaning (metadata strip only)
-# Disabled by default because PARANOID mode can take many minutes per clip.
-# Set ACE_STEP_CLEAN_MODE to 'fast' or 'paranoid' to enable Step 3 for one run.
-WATERMARK_CLEAN_MODE = os.environ.get("ACE_STEP_CLEAN_MODE", "off")
+# SynthID removal runs through the dedicated Conda environment, where the
+# remove-ai-watermarks video runtime and its diffusion dependencies are installed.
+WATERMARK_CONDA_ENV = "video_creation"
+WATERMARK_NOISE_STD = "0.10"
+WATERMARK_FPS = "30"
+WATERMARK_LONG_SIDE = "784"
 
 # AI enhancement is enabled automatically when the bundled Real-ESRGAN executable exists.
 # Set ACE_STEP_AI_UPSCALE=0 to use the faster Lanczos-only fallback.
@@ -169,6 +168,47 @@ def _require_ffmpeg() -> None:
                 "  Windows: https://www.gyan.dev/ffmpeg/builds/\n"
                 "  Add the bin/ folder to your system PATH and restart."
             )
+
+
+def _remove_video_watermarks(video_path: Path, out_path: Path) -> Path:
+    """Run the configured SynthID and visible-mark cleanup for one video.
+
+    Args:
+        video_path: Source video after the metadata-cleaning stage.
+        out_path: Destination for the regenerated video.
+
+    Returns:
+        The completed output path.
+
+    Raises:
+        RuntimeError: If the watermark-removal command fails.
+    """
+    cmd = [
+        "conda",
+        "run",
+        "-n",
+        WATERMARK_CONDA_ENV,
+        "remove-ai-watermarks",
+        "video",
+        "all",
+        str(video_path),
+        "-o",
+        str(out_path),
+        "--invisible",
+        "--noise-std",
+        WATERMARK_NOISE_STD,
+        "--fps",
+        WATERMARK_FPS,
+        "--long-side",
+        WATERMARK_LONG_SIDE,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        details = result.stderr.strip() or result.stdout.strip()
+        raise RuntimeError(f"SynthID watermark removal failed:\n{details}")
+    if result.stdout.strip():
+        print(result.stdout.strip())
+    return out_path
 
 
 def _collect_mp3s(root: Path) -> list[Path]:
@@ -977,21 +1017,11 @@ def main() -> None:
         clean_stage_video = strip_container_metadata(input_video, meta_cleaned_video)
         print(f"      Metadata stripped in {time.perf_counter() - t_meta:.2f}s")
 
-        # 3. Deep AI watermark mitigation
-        mode = WATERMARK_CLEAN_MODE.lower()
-        print(f"\n[3/6] Mitigating AI watermarks (mode: {mode.upper()})...")
-        if mode != "off":
-            t_clean = time.perf_counter()
-            clean_stage_video = deep_clean_frames(
-                video_path=clean_stage_video,
-                out_path=deep_cleaned_video,
-                encoder=encoder,
-                duration=video_duration,
-                mode=mode,  # type: ignore[arg-type]
-            )
-            print(f"      Watermark cleaning finished in {time.perf_counter() - t_clean:.1f}s")
-        else:
-            print("      Frame-level watermark cleaning disabled (ACE_STEP_CLEAN_MODE=off).")
+        # 3. Visible-mark and SynthID cleanup through remove-ai-watermarks.
+        print("\n[3/6] Removing visible marks and SynthID (noise 0.10, 30 fps, long side 784)...")
+        t_clean = time.perf_counter()
+        clean_stage_video = _remove_video_watermarks(clean_stage_video, deep_cleaned_video)
+        print(f"      Watermark cleaning finished in {time.perf_counter() - t_clean:.1f}s")
 
         # 4. Enhance / upscale input video to 1080p if needed
         print("\n[4/6] Enhancing input video to 1080p (if needed)...")
