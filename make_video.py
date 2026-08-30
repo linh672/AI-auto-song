@@ -88,7 +88,7 @@ AUDIO_BITRATE = "320k"
 # SynthID removal runs through the dedicated Conda environment, where the
 # remove-ai-watermarks video runtime and its diffusion dependencies are installed.
 WATERMARK_CONDA_ENV = "video_creation"
-WATERMARK_NOISE_STD = "0.10"
+WATERMARK_NOISE_STD = "0"
 WATERMARK_FPS = "30"
 WATERMARK_LONG_SIDE = "784"
 
