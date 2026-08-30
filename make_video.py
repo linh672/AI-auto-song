@@ -46,6 +46,7 @@ Standard library, **ffmpeg >= 6.0**, **numpy**, **scipy**, and optional **diffus
 
 from __future__ import annotations
 
+import argparse
 import glob
 import os
 import subprocess
@@ -953,8 +954,23 @@ def _run_ffmpeg(cmd: list[str], step_name: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def main() -> None:
-    """Orchestrate parallel probe, watermark clean, upscale, audio concat, GPU loop+merge."""
+def _parse_args() -> argparse.Namespace:
+    """Parse command-line options for the video-building workflow."""
+    parser = argparse.ArgumentParser(description="Build a music video from generated audio and input video.")
+    parser.add_argument(
+        "--off-step-3",
+        action="store_true",
+        help="Skip step 3: visible-mark and SynthID cleanup.",
+    )
+    return parser.parse_args()
+
+
+def main(*, step_3_enabled: bool = True) -> None:
+    """Orchestrate probes, optional watermark cleanup, upscale, audio concat, and muxing.
+
+    Args:
+        step_3_enabled: Whether to run visible-mark and SynthID cleanup in step 3.
+    """
     start_total_time = time.perf_counter()
     print("=" * 60)
     print("  ACE-Step - Draft Audio -> Video Builder  [GPU-optimised]")
@@ -1018,10 +1034,17 @@ def main() -> None:
         print(f"      Metadata stripped in {time.perf_counter() - t_meta:.2f}s")
 
         # 3. Visible-mark and SynthID cleanup through remove-ai-watermarks.
-        print("\n[3/6] Removing visible marks and SynthID (noise 0.10, 30 fps, long side 784)...")
-        t_clean = time.perf_counter()
-        clean_stage_video = _remove_video_watermarks(clean_stage_video, deep_cleaned_video)
-        print(f"      Watermark cleaning finished in {time.perf_counter() - t_clean:.1f}s")
+        if step_3_enabled:
+            print(
+                "\n[3/6] Removing visible marks and SynthID "
+                f"(noise {WATERMARK_NOISE_STD}, {WATERMARK_FPS} fps, "
+                f"long side {WATERMARK_LONG_SIDE})..."
+            )
+            t_clean = time.perf_counter()
+            clean_stage_video = _remove_video_watermarks(clean_stage_video, deep_cleaned_video)
+            print(f"      Watermark cleaning finished in {time.perf_counter() - t_clean:.1f}s")
+        else:
+            print("\n[3/6] Watermark cleanup disabled (--off-step-3).")
 
         # 4. Enhance / upscale input video to 1080p if needed
         print("\n[4/6] Enhancing input video to 1080p (if needed)...")
@@ -1087,7 +1110,8 @@ def main() -> None:
 
 if __name__ == "__main__":
     try:
-        main()
+        args = _parse_args()
+        main(step_3_enabled=not args.off_step_3)
     except (FileNotFoundError, RuntimeError) as exc:
         print(f"\n[ERROR] {exc}", file=sys.stderr)
         sys.exit(1)
