@@ -50,7 +50,7 @@ _DENOISE_STRENGTH: float = float(os.environ.get("ACE_STEP_DENOISE", "0.10"))
 _DIFFUSION_STEPS: int = 2          # SDXL-Turbo: 1–4 steps recommended
 _GUIDANCE_SCALE: float = 0.0       # Turbo uses classifier-free guidance = 0
 _CONTROLNET_SCALE: float = 0.55    # ControlNet conditioning strength
-_DIFFUSION_BLEND: float = float(os.environ.get("ACE_STEP_DIFFUSION_BLEND", "0.25"))
+_DIFFUSION_BLEND: float = float(os.environ.get("ACE_STEP_DIFFUSION_BLEND", "0.75"))
 
 _SDXL_TURBO_REPO: str = "stabilityai/sdxl-turbo"
 _CONTROLNET_REPO: str = "diffusers/controlnet-canny-sdxl-1.0"

@@ -89,7 +89,9 @@ AUDIO_BITRATE = "320k"
 # 'fast'    -> CPU 2D-FFT Butterworth notch (~18ms/frame)
 # 'paranoid'-> GPU SDXL-Turbo + ControlNet Canny diffusion pass (~3.2s/frame)
 # 'off'     -> Skip frame-level cleaning (metadata strip only)
-WATERMARK_CLEAN_MODE = os.environ.get("ACE_STEP_CLEAN_MODE", "paranoid")
+# Disabled by default because PARANOID mode can take many minutes per clip.
+# Set ACE_STEP_CLEAN_MODE to 'fast' or 'paranoid' to enable Step 3 for one run.
+WATERMARK_CLEAN_MODE = os.environ.get("ACE_STEP_CLEAN_MODE", "off")
 
 # AI enhancement is enabled automatically when the bundled Real-ESRGAN executable exists.
 # Set ACE_STEP_AI_UPSCALE=0 to use the faster Lanczos-only fallback.

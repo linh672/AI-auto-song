@@ -295,6 +295,27 @@ The builder requires FFmpeg and FFprobe on `PATH`. When the bundled
 before producing the 1080p video. The final loop is encoded at a constant frame
 rate to prevent a pause at each loop boundary.
 
+### Step 3 processing switch
+
+Frame-level processing in Step 3 is off by default. Enable it only for a
+single PowerShell session when needed:
+
+```powershell
+# Fast CPU mode
+$env:ACE_STEP_CLEAN_MODE="fast"
+python make_video.py
+
+# Thorough GPU mode (takes several minutes for a short clip)
+$env:ACE_STEP_CLEAN_MODE="paranoid"
+python make_video.py
+```
+
+Turn it off again with:
+
+```powershell
+$env:ACE_STEP_CLEAN_MODE="off"
+```
+
 To use the faster Lanczos-only path for one PowerShell session:
 
 ```powershell
