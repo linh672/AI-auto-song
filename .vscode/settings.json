@@ -1,0 +1,11 @@
+{
+    "python.defaultInterpreterPath": "C:\\Users\\PC\\anaconda3\\envs\\video_creation\\python.exe",
+    "python.terminal.activateEnvironment": true,
+    "terminal.integrated.profiles.windows": {
+        "PowerShell": {
+            "source": "PowerShell",
+            "args": ["-NoExit", "-Command", "conda activate video_creation"]
+        }
+    },
+    "terminal.integrated.defaultProfile.windows": "PowerShell"
+} 

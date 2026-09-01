@@ -5,6 +5,9 @@ from .. import queue_handlers as q_handlers
 from acestep.queue.task_queue_manager import get_task_queue_manager
 
 
+QUEUE_UI_CONCURRENCY_ID = "queue-ui"
+
+
 def register_queue_handlers(
     generation_section: dict[str, Any],
     results_section: dict[str, Any],
@@ -100,6 +103,8 @@ def register_queue_handlers(
             fn=q_handlers.add_to_queue_handler,
             inputs=queue_inputs,
             outputs=queue_ui_outputs,
+            concurrency_id=QUEUE_UI_CONCURRENCY_ID,
+            concurrency_limit=1,
         )
 
     # Add Multiple to Queue click (batch task)
@@ -108,24 +113,32 @@ def register_queue_handlers(
             fn=q_handlers.add_to_queue_handler,
             inputs=queue_inputs + [generation_section["queue_count"]],
             outputs=queue_ui_outputs,
+            concurrency_id=QUEUE_UI_CONCURRENCY_ID,
+            concurrency_limit=1,
         )
 
     # Refresh queue table
     queue_section["refresh_queue_btn"].click(
         fn=q_handlers.refresh_queue_ui_handler,
         outputs=queue_ui_outputs,
+        concurrency_id=QUEUE_UI_CONCURRENCY_ID,
+        concurrency_limit=1,
     )
 
     # Toggle pause
     queue_section["toggle_pause_btn"].click(
         fn=q_handlers.toggle_pause_handler,
         outputs=queue_ui_outputs,
+        concurrency_id=QUEUE_UI_CONCURRENCY_ID,
+        concurrency_limit=1,
     )
 
     # Clear completed
     queue_section["clear_completed_btn"].click(
         fn=q_handlers.clear_completed_handler,
         outputs=queue_ui_outputs,
+        concurrency_id=QUEUE_UI_CONCURRENCY_ID,
+        concurrency_limit=1,
     )
 
     # Select task dropdown
@@ -137,4 +150,6 @@ def register_queue_handlers(
             *queue_section["task_audio_previews"],
             queue_section["task_details_markdown"],
         ],
+        concurrency_id=QUEUE_UI_CONCURRENCY_ID,
+        concurrency_limit=1,
     )

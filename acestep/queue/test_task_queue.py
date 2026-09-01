@@ -46,6 +46,15 @@ class TestTaskQueueManager(unittest.TestCase):
         self.assertEqual(len(self.manager.get_tasks()), 1)
         self.assertEqual(self.manager.get_task(task.id), task)
 
+    def test_add_tasks_adds_a_batch_atomically(self):
+        """Bulk queue insertion creates independent tasks in their original order."""
+        tasks = self.manager.add_tasks("Batch", {"captions": "test"}, 3)
+
+        self.assertEqual(len(tasks), 3)
+        self.assertEqual(self.manager.get_tasks(), tasks)
+        self.assertEqual(len({task.id for task in tasks}), 3)
+        self.assertIsNot(tasks[0].params, tasks[1].params)
+
     def test_get_table_rows_includes_one_based_index(self):
         """Queue table rows include a stable one-based display index."""
         self.manager.add_task(title="First", params={})

@@ -86,9 +86,14 @@ def add_to_queue_handler(
         count = 1
 
     qm = get_task_queue_manager()
-    last_task = None
-    for _ in range(count):
-        last_task = qm.add_task(title=title, params=dict(params), lora_path=active_lora, lora_scale=lora_scale)
+    tasks = qm.add_tasks(
+        title=title,
+        params=params,
+        count=count,
+        lora_path=active_lora,
+        lora_scale=lora_scale,
+    )
+    last_task = tasks[-1]
 
     if count == 1 and last_task:
         gr.Info(t("queue.task_added", title=last_task.title))

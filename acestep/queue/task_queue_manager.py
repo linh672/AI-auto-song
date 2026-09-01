@@ -49,17 +49,31 @@ class TaskQueueManager:
         lora_scale: float = 1.0,
     ) -> GenerationTask:
         """Add a new task to the queue."""
-        task = GenerationTask(
-            title=title or "Untitled Song",
-            params=params,
-            lora_path=lora_path,
-            lora_scale=lora_scale,
-        )
+        return self.add_tasks(title, params, 1, lora_path, lora_scale)[0]
+
+    def add_tasks(
+        self,
+        title: str,
+        params: dict[str, Any],
+        count: int,
+        lora_path: str | None = None,
+        lora_scale: float = 1.0,
+    ) -> list[GenerationTask]:
+        """Atomically add a batch of tasks and start the worker once.
+
+        Each task receives its own shallow parameter mapping so later task
+        changes cannot affect its siblings.
+        """
+        tasks = [
+            GenerationTask(title=title or "Untitled Song", params=dict(params),
+                           lora_path=lora_path, lora_scale=lora_scale)
+            for _ in range(count)
+        ]
         with self._lock:
-            self._tasks.append(task)
-        logger.info(f"[TaskQueue] Added task {task.id}: '{task.title}' (LoRA: {task.lora_path})")
+            self._tasks.extend(tasks)
+        logger.info(f"[TaskQueue] Added {len(tasks)} task(s): '{title}' (LoRA: {lora_path})")
         self._ensure_worker_running()
-        return task
+        return tasks
 
     def get_tasks(self) -> list[GenerationTask]:
         """Return shallow copy of all tasks."""
