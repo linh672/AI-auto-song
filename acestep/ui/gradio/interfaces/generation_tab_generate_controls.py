@@ -111,7 +111,7 @@ def build_generate_row_controls(
         with gr.Column(scale=4):
             with gr.Row(equal_height=True):
                 queue_count = gr.Number(
-                    value=5,
+                    value=100,
                     minimum=1,
                     maximum=100,
                     step=1,
