@@ -5,7 +5,50 @@ from __future__ import annotations
 import argparse
 import unittest
 
-from acestep.cli_args import parse_quantization_arg
+from acestep.cli_args import normalize_batch_args, parse_quantization_arg
+
+
+class NormalizeBatchArgsTests(unittest.TestCase):
+    """Behavior tests for batch argument normalization."""
+
+    def test_normalizes_double_dash_batch_value(self) -> None:
+        """--batch --100 is normalized to --batch 100."""
+        argv = ["acestep", "--batch", "--100"]
+        self.assertEqual(["acestep", "--batch", "100"], normalize_batch_args(argv))
+
+    def test_normalizes_equals_double_dash_batch_value(self) -> None:
+        """--batch=--100 is normalized to --batch=100."""
+        argv = ["acestep", "--batch=--100"]
+        self.assertEqual(["acestep", "--batch=100"], normalize_batch_args(argv))
+
+    def test_normalizes_standalone_double_dash_number(self) -> None:
+        """--100 is normalized to --batch 100."""
+        argv = ["acestep", "--100"]
+        self.assertEqual(["acestep", "--batch", "100"], normalize_batch_args(argv))
+
+    def test_preserves_plain_batch_flag(self) -> None:
+        """--batch without number is preserved for const default."""
+        argv = ["acestep", "--batch"]
+        self.assertEqual(["acestep", "--batch"], normalize_batch_args(argv))
+
+    def test_preserves_batch_with_standard_number(self) -> None:
+        """--batch 50 is preserved."""
+        argv = ["acestep", "--batch", "50"]
+        self.assertEqual(["acestep", "--batch", "50"], normalize_batch_args(argv))
+
+    def test_handles_batch_followed_by_another_flag(self) -> None:
+        """--batch --port 7860 leaves --port untouched."""
+        argv = ["acestep", "--batch", "--port", "7860"]
+        self.assertEqual(["acestep", "--batch", "--port", "7860"], normalize_batch_args(argv))
+
+    def test_preserves_negative_option_values(self) -> None:
+        """-1 (single dash) is not converted to --batch."""
+        argv = ["acestep", "--audio_duration", "-1"]
+        self.assertEqual(["acestep", "--audio_duration", "-1"], normalize_batch_args(argv))
+
+    def test_empty_argv(self) -> None:
+        """Empty argv returns empty list."""
+        self.assertEqual([], normalize_batch_args([]))
 
 
 class ParseQuantizationArgTests(unittest.TestCase):
@@ -35,3 +78,4 @@ class ParseQuantizationArgTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

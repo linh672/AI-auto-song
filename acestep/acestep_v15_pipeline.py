@@ -43,7 +43,7 @@ os.environ["TORCHAUDIO_USE_BACKEND"] = "ffmpeg"
 
 try:
     # When executed as a module: `python -m acestep.acestep_v15_pipeline`
-    from .cli_args import parse_quantization_arg
+    from .cli_args import parse_quantization_arg, normalize_batch_args
     from .handler import AceStepHandler
     from .llm_inference import LLMHandler
     from .dataset_handler import DatasetHandler
@@ -60,12 +60,13 @@ try:
         is_mps_platform,
     )
     from .model_downloader import ensure_lm_model
+    from .queue.startup_batch import enqueue_startup_batch_tasks
 except ImportError:
     # When executed as a script: `python acestep/acestep_v15_pipeline.py`
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
-    from acestep.cli_args import parse_quantization_arg
+    from acestep.cli_args import parse_quantization_arg, normalize_batch_args
     from acestep.handler import AceStepHandler
     from acestep.llm_inference import LLMHandler
     from acestep.dataset_handler import DatasetHandler
@@ -82,6 +83,7 @@ except ImportError:
         is_mps_platform,
     )
     from acestep.model_downloader import ensure_lm_model
+    from acestep.queue.startup_batch import enqueue_startup_batch_tasks
 
 
 def create_demo(init_params=None, language="en"):
@@ -360,6 +362,26 @@ def main():
         default=None,
         help="Default batch size for generation (1-8). Defaults to min(2, GPU_max) if not specified",
     )
+    parser.add_argument(
+        "--batch",
+        nargs="?",
+        const=100,
+        type=int,
+        default=None,
+        help="Automatically initialize service and enqueue batch generation tasks (default: 100)",
+    )
+    parser.add_argument(
+        "--caption",
+        type=str,
+        default=None,
+        help="Music caption/prompt for batch generation (defaults to standard placeholder)",
+    )
+    parser.add_argument(
+        "--lyrics",
+        type=str,
+        default=None,
+        help="Lyrics for batch generation",
+    )
 
     # API mode argument
     parser.add_argument(
@@ -388,7 +410,14 @@ def main():
         help="API key for API endpoints authentication",
     )
 
+    sys.argv = normalize_batch_args(sys.argv)
     args = parser.parse_args()
+
+    # Batch generation mode forces service initialization
+    if args.batch is not None:
+        args.batch = max(1, args.batch)
+        args.init_service = True
+        print(f"Batch mode requested: {args.batch} tasks will be queued on startup")
 
     # Enable API requires init_service
     if args.enable_api:
@@ -610,6 +639,7 @@ def main():
                 "gpu_config": gpu_config,  # Pass GPU config to UI
                 "output_dir": output_dir,  # Pass output dir to UI
                 "default_batch_size": args.batch_size,  # Pass user-specified default batch size
+                "default_queue_count": args.batch,  # Pass user-specified batch count if any
             }
 
             print("Service initialization completed successfully!")
@@ -624,9 +654,21 @@ def main():
                 "language": args.language,
                 "output_dir": output_dir,  # Pass output dir to UI
                 "default_batch_size": args.batch_size,  # Pass user-specified default batch size
+                "default_queue_count": args.batch,  # Pass user-specified batch count if any
             }
 
         demo = create_demo(init_params=init_params, language=args.language)
+
+        # If batch mode is requested, enqueue the tasks into the task queue manager
+        if args.batch is not None and dit_handler is not None:
+            enqueue_startup_batch_tasks(
+                count=args.batch,
+                dit_handler=dit_handler,
+                llm_handler=llm_handler,
+                batch_size=args.batch_size,
+                caption=args.caption,
+                lyrics=args.lyrics,
+            )
 
         # Enable queue for multi-user support
         # This ensures proper request queuing and prevents concurrent generation conflicts

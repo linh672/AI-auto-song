@@ -21,6 +21,29 @@
 
 ## 📰 News
 
+<h1 align="center">ACE-Step 1.5</h1>
+<h1 align="center">Pushing the Boundaries of Open-Source Music Generation</h1>
+<p align="center">
+    <a href="https://acemusic.ai">ACEMusic</a> |
+    <a href="https://ace-step.github.io/ace-step-v1.5.github.io/">Project</a> |
+    <a href="https://huggingface.co/ACE-Step/Ace-Step1.5">Hugging Face</a> |
+    <a href="https://modelscope.cn/models/ACE-Step/Ace-Step1.5">ModelScope</a> |
+    <a href="https://huggingface.co/spaces/ACE-Step/ACE-Step-v1.5">Space Demo</a> |
+    <a href="https://discord.gg/PeWDxrkdj7">Discord</a> |
+    <a href="https://arxiv.org/abs/2602.00744">Technical Report</a> |
+    <a href="https://github.com/ace-step/awesome-ace-step">Awesome ACE-Step</a>
+</p>
+
+<p align="center">
+    <img src="./assets/organization_logos.png" height="80" alt="StepFun Logo" style="vertical-align: middle;">
+    &nbsp;&nbsp;
+    <a href="https://acemusic.ai">
+        <img src="./assets/acemusic-logo.svg" height="57" alt="ACEMusic - Try ACE-Step Online" style="vertical-align: middle; position: relative; top: 2px;">
+    </a>
+</p>
+
+## 📰 News
+
 > 🎵 **Want a faster & more stable experience? Try [acemusic.ai](https://acemusic.ai) — 100% free!**
 
 - **[2026-04-02] 🎉 ACE-Step 1.5 XL (4B DiT) Released!** — We introduce the XL series with a 4B-parameter DiT decoder for higher audio quality. Three variants available: [xl-base](https://huggingface.co/ACE-Step/acestep-v15-xl-base), [xl-sft](https://huggingface.co/ACE-Step/acestep-v15-xl-sft), [xl-turbo](https://huggingface.co/ACE-Step/acestep-v15-xl-turbo). Requires ≥12GB VRAM (with offload), ≥20GB recommended. All LM models fully compatible. See [Model Zoo](#-model-zoo) for details.
@@ -31,6 +54,7 @@
 - [✨ Features](#-features)
 - [⚡ Quick Start](#-quick-start)
 - [🚀 Launch Scripts](#-launch-scripts)
+- [🎵 Batch Generation Mode](#-batch-generation-mode)
 - [📚 Documentation](#-documentation)
 - [📖 Tutorial](#-tutorial)
 - [🏗️ Architecture](#️-architecture)
@@ -278,6 +302,49 @@ See also the **LoRA Training** tab in Gradio UI for one-click training, or [Grad
 | `acestep-5Hz-lm-0.6B` | Qwen3-0.6B | ✅ | ✅ | ✅ | ✅ | ✅ | Medium | Medium | Weak | ✅ |
 | `acestep-5Hz-lm-1.7B` | Qwen3-1.7B | ✅ | ✅ | ✅ | ✅ | ✅ | Medium | Medium | Medium | ✅ |
 | `acestep-5Hz-lm-4B` | Qwen3-4B | ✅ | ✅ | ✅ | ✅ | ✅ | Strong | Strong | Strong | ✅ |
+
+## 🎵 Batch Generation Mode
+
+The `--batch` flag lets you skip the manual UI steps ("Initialize Service" → "Add Batch") and queue
+hundreds of generation tasks from a single command.
+
+```bash
+# Queue 100 tasks (default) — service auto-initializes
+python -m acestep.acestep_v15_pipeline --batch
+
+# Shorthand form (the --100 is automatically normalized)
+python -m acestep.acestep_v15_pipeline --batch --100
+
+# Custom task count
+python -m acestep.acestep_v15_pipeline --batch 50
+
+# With a custom music prompt
+python -m acestep.acestep_v15_pipeline --batch --caption "Lo-fi chill piano beats"
+
+# With a custom prompt and lyrics
+python -m acestep.acestep_v15_pipeline --batch \
+  --caption "Soft jazz ballad, warm acoustic guitar" \
+  --lyrics "[Verse 1]\nUnder the quiet sky"
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--batch [N]` | `100` | Queue N generation tasks; omitting N defaults to 100 |
+| `--caption TEXT` | placeholder | Music style/genre description for batch tasks |
+| `--lyrics TEXT` | *(empty)* | Lyrics for batch tasks |
+
+> **Note:** `--batch` automatically forces `--init_service true`, so you do **not** need to click
+> "Initialize Service" in the UI. The Gradio interface opens normally alongside the running queue.
+
+### Full automated workflow
+
+```bash
+# Step 1 — Generate audio in batch
+python -m acestep.acestep_v15_pipeline --batch --caption "Your music description here"
+
+# Step 2 — Build video from generated audio
+python make_video.py
+```
 
 ## 🎬 Audio-to-Video Builder
 

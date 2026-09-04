@@ -60,6 +60,8 @@ class PipelineStartupBackendTests(unittest.TestCase):
             captured["language"] = language
             return demo
 
+        mock_enqueue = MagicMock()
+
         with patch.object(sys, "argv", argv), patch.dict(os.environ, env or {}, clear=True), patch(
             "acestep.acestep_v15_pipeline.get_gpu_config",
             return_value=gpu_config,
@@ -87,10 +89,38 @@ class PipelineStartupBackendTests(unittest.TestCase):
             return_value=(True, "ok"),
         ), patch(
             "acestep.acestep_v15_pipeline.os.makedirs"
+        ), patch(
+            "acestep.acestep_v15_pipeline.enqueue_startup_batch_tasks",
+            mock_enqueue,
         ):
             acestep_v15_pipeline.main()
 
+        captured["mock_enqueue"] = mock_enqueue
         return llm_handler, captured
+
+    def test_main_batch_flag_defaults_to_100_and_enqueues(self) -> None:
+        """--batch without arguments should default to 100 and auto-initialize service."""
+        _, captured = self._run_main(["acestep", "--batch"])
+        self.assertTrue(captured["init_params"]["pre_initialized"])
+        self.assertEqual(100, captured["init_params"]["default_queue_count"])
+        captured["mock_enqueue"].assert_called_once()
+        self.assertEqual(100, captured["mock_enqueue"].call_args.kwargs["count"])
+
+    def test_main_batch_with_double_dash_100(self) -> None:
+        """--batch --100 should parse as 100 batch tasks."""
+        _, captured = self._run_main(["acestep", "--batch", "--100"])
+        self.assertTrue(captured["init_params"]["pre_initialized"])
+        self.assertEqual(100, captured["init_params"]["default_queue_count"])
+        captured["mock_enqueue"].assert_called_once()
+        self.assertEqual(100, captured["mock_enqueue"].call_args.kwargs["count"])
+
+    def test_main_batch_with_custom_count(self) -> None:
+        """--batch 50 should queue 50 batch tasks."""
+        _, captured = self._run_main(["acestep", "--batch", "50"])
+        self.assertTrue(captured["init_params"]["pre_initialized"])
+        self.assertEqual(50, captured["init_params"]["default_queue_count"])
+        captured["mock_enqueue"].assert_called_once()
+        self.assertEqual(50, captured["mock_enqueue"].call_args.kwargs["count"])
 
     def test_main_forces_pt_backend_for_explicit_vllm_argument(self) -> None:
         """Legacy CUDA startup should override an explicit CLI vLLM request."""
