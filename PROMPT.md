@@ -17,3 +17,19 @@ Lo-fi hip hop and chillhop with laid-back swung drums, mellow piano loops, soft 
 conda activate video_creation
 python -m acestep.acestep_v15_pipeline
 python make_video.py 
+
+
+python -m acestep.acestep_v15_pipeline --batch (best)
+
+.vscode\settings.json:
+{
+    "python.defaultInterpreterPath": "C:\\Users\\PC\\anaconda3\\envs\\video_creation\\python.exe",
+    "python.terminal.activateEnvironment": true,
+    "terminal.integrated.profiles.windows": {
+        "PowerShell": {
+            "source": "PowerShell",
+            "args": ["-NoExit", "-Command", "conda activate video_creation"]
+        }
+    },
+    "terminal.integrated.defaultProfile.windows": "PowerShell"
+}
