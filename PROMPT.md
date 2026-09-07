@@ -5,7 +5,7 @@ change the cat in the second picture into the dog in the first picture keep the 
 
 change the background to smth else keep the style
 
-give me prompt to animate this picture
+give me prompt to animate this picture and provide a vietnamese version below. (make it simple, dont animate realted to light), focus on the movement of the puppy, just and environment.
 
 
 
