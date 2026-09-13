@@ -64,6 +64,8 @@
     "mlx_dit_info_enabled": "使用原生 MLX 加速 DiT 扩散推理（比 MPS 更快）",
     "mlx_dit_info_disabled": "MLX 不可用（需要 macOS + Apple Silicon + mlx 包）",
     "init_btn": "初始化服务",
+    "auto_add_batch_label": "初始化后自动添加100批次",
+    "auto_add_batch_info": "服务初始化成功后自动向队列添加100个批次任务。",
     "status_label": "状态",
     "language_label": "界面语言",
     "language_info": "选择界面语言。",

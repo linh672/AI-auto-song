@@ -125,9 +125,15 @@ def build_service_init_controls(service_pre_initialized: bool, params: dict[str,
         params: Startup state dictionary containing optional init status text.
 
     Returns:
-        A component map containing ``init_btn`` and ``init_status``.
+        A component map containing ``init_btn``, ``init_status``, and ``auto_add_batch``.
     """
 
+    auto_add_batch = gr.Checkbox(
+        label=t("service.auto_add_batch_label"),
+        value=True,
+        info=t("service.auto_add_batch_info"),
+        elem_classes=["has-info-container"],
+    )
     init_btn = gr.Button(t("service.init_btn"), variant="primary", size="lg")
     init_status = gr.Textbox(
         label=t("service.status_label"),
@@ -135,4 +141,8 @@ def build_service_init_controls(service_pre_initialized: bool, params: dict[str,
         lines=3,
         value=params.get("init_status", "") if service_pre_initialized else "",
     )
-    return {"init_btn": init_btn, "init_status": init_status}
+    return {
+        "init_btn": init_btn,
+        "init_status": init_status,
+        "auto_add_batch": auto_add_batch,
+    }

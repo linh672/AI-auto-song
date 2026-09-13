@@ -371,8 +371,9 @@ def create_gradio_interface(dit_handler, llm_handler, dataset_handler, init_para
                 gen_section["results_wrapper"] = results_wrapper
 
             # --- Task Queue Tab ---
-            with gr.Tab(t("queue.tab_title")):
+            with gr.Tab(t("queue.tab_title")) as queue_tab:
                 queue_section = create_task_queue_section()
+                queue_section["tab"] = queue_tab
             
             # --- Training Tab ---
             with gr.Tab(t("training.tab_title"), visible=not service_mode):

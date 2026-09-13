@@ -110,6 +110,9 @@ def register_generation_service_handlers(
             generation_section["generation_mode"],
             generation_section["batch_size_input"],
             generation_section["vae_checkpoint"],
+            generation_section["auto_add_batch"],
+            generation_section["captions"],
+            generation_section["lyrics"],
         ],
         outputs=[
             generation_section["init_status"],

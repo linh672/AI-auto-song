@@ -16,6 +16,7 @@ from acestep.gpu_config import (
     resolve_lm_backend,
 )
 from .model_config import is_pure_base_model, is_sft_model, is_xl_model, get_model_type_ui_settings
+from .service_auto_batch import is_service_init_successful, maybe_auto_enqueue_batch
 
 
 def _select_quantization_value(
@@ -57,7 +58,8 @@ def init_service_wrapper(
     init_llm, lm_model_path, backend, use_flash_attention,
     offload_to_cpu, offload_dit_to_cpu, compile_model, quantization,
     mlx_dit=True, current_mode=None, current_batch_size=None,
-    vae_checkpoint=None,
+    vae_checkpoint=None, auto_add_batch=False,
+    captions=None, lyrics=None,
 ):
     """Wrapper for service initialization.
 
@@ -132,6 +134,8 @@ def init_service_wrapper(
         vae_checkpoint=vae_checkpoint,
     )
 
+    lm_status = ""
+    lm_success = False
     if init_llm:
         checkpoint_dir = os.path.join(project_root, "checkpoints")
 
@@ -212,6 +216,28 @@ def init_service_wrapper(
         status += f", available_lm={gpu_config.available_lm_models}"
     else:
         status += ", LM not available for this GPU tier"
+
+    if auto_add_batch:
+        if is_service_init_successful(
+            dit_handler=dit_handler,
+            enable=enable,
+            init_llm=init_llm,
+            lm_success=lm_success,
+            lm_status=lm_status,
+        ):
+            tasks = maybe_auto_enqueue_batch(
+                dit_handler=dit_handler,
+                llm_handler=llm_handler,
+                count=100,
+                batch_size=batch_value,
+                caption=captions,
+                lyrics=lyrics,
+            )
+            status += f"\n\n✅ Auto-Batch: Enqueued {len(tasks)} tasks into generation queue."
+        else:
+            logger.warning(
+                "[Auto-Batch] Skipped auto-batch enqueue: service initialization did not complete successfully."
+            )
 
     think_interactive = lm_actually_initialized
 

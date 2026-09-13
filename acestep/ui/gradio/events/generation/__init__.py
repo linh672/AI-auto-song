@@ -23,6 +23,10 @@ from .service_init import (
     init_service_wrapper,
     on_tier_change,
 )
+from .service_auto_batch import (
+    is_service_init_successful,
+    maybe_auto_enqueue_batch,
+)
 from .model_config import (
     is_pure_base_model,
     is_sft_model,

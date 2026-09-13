@@ -125,6 +125,14 @@ def register_queue_handlers(
         concurrency_limit=1,
     )
 
+    if "tab" in queue_section and queue_section["tab"] is not None:
+        queue_section["tab"].select(
+            fn=q_handlers.refresh_queue_ui_handler,
+            outputs=queue_ui_outputs,
+            concurrency_id=QUEUE_UI_CONCURRENCY_ID,
+            concurrency_limit=1,
+        )
+
     # Toggle pause
     queue_section["toggle_pause_btn"].click(
         fn=q_handlers.toggle_pause_handler,

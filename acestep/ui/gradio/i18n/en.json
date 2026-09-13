@@ -66,6 +66,8 @@
     "mlx_dit_info_enabled": "Runs the DiT diffusion model using Apple's native MLX framework instead of PyTorch MPS. Significantly faster on M1/M2/M3/M4 Macs. Recommended for Apple Silicon users.",
     "mlx_dit_info_disabled": "MLX not available. Requires: macOS + Apple Silicon (M1/M2/M3/M4) + mlx package installed. Install with: pip install mlx.",
     "init_btn": "Initialize Service",
+    "auto_add_batch_label": "Auto Add 100 Batch",
+    "auto_add_batch_info": "Automatically enqueue 100 batch tasks to the queue upon successful service initialization.",
     "status_label": "Status",
     "language_label": "UI Language",
     "language_info": "Select interface language.",
