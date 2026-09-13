@@ -12,6 +12,7 @@ Workflow
 7. Loop-extend the 1080p video via MPEG-TS stream-copy to match audio duration.
 8. Merge the looped video with the concatenated audio (zero re-encode) and write
    the result to ``output/<timestamp>_final.mp4``.
+9. Move used input video and batch folders from ``gradio_outputs/`` to ``archive/``.
 
 Hardware targets
 ----------------
@@ -49,6 +50,7 @@ from __future__ import annotations
 import argparse
 import glob
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -69,6 +71,7 @@ ROOT_DIR = Path(__file__).parent.resolve()
 GRADIO_OUTPUTS_DIR = ROOT_DIR / "gradio_outputs"
 INPUT_DIR = ROOT_DIR / "input"
 OUTPUT_DIR = ROOT_DIR / "output"
+ARCHIVE_DIR = ROOT_DIR / "archive"
 
 # i9-14HX: 8 P-cores + 16 E-cores = 24 cores / 32 threads.
 # ffmpeg benefits most from P-core count for decode; keep 16 for encode headroom.
@@ -949,6 +952,99 @@ def _run_ffmpeg(cmd: list[str], step_name: str) -> None:
         raise RuntimeError(f"{step_name} failed:\n{proc.stderr.decode()}")
 
 
+def _safe_move_to_archive(src: Path, archive_dir: Path) -> Path:
+    """Safely move a file or directory into archive_dir, avoiding overwrite and nested dirs.
+
+    Args:
+        src: Source path (file or directory) to move.
+        archive_dir: Destination parent directory.
+
+    Returns:
+        The resolved destination Path in archive_dir.
+    """
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    dst = archive_dir / src.name
+
+    if not dst.exists():
+        shutil.move(str(src), str(dst))
+        return dst
+
+    if src.is_file():
+        stem = src.stem
+        suffix = src.suffix
+        counter = 1
+        while dst.exists():
+            dst = archive_dir / f"{stem}_{counter}{suffix}"
+            counter += 1
+        shutil.move(str(src), str(dst))
+        return dst
+
+    # Directory collision: merge contents to prevent nested directory duplication
+    for child in list(src.iterdir()):
+        child_dst = dst / child.name
+        if child.is_dir():
+            _safe_move_to_archive(child, dst)
+        else:
+            if child_dst.exists():
+                child_dst.unlink()
+            shutil.move(str(child), str(child_dst))
+    try:
+        src.rmdir()
+    except OSError:
+        pass
+    return dst
+
+
+def archive_sources(
+    input_video: Path,
+    mp3_files: list[Path],
+    gradio_outputs_dir: Path = GRADIO_OUTPUTS_DIR,
+    archive_dir: Path = ARCHIVE_DIR,
+) -> tuple[Path | None, list[Path]]:
+    """Move the input video and used gradio_outputs batch folders to archive_dir.
+
+    Args:
+        input_video: Path to the input video file used.
+        mp3_files: List of all MP3 file paths used to create the audio track.
+        gradio_outputs_dir: Root gradio_outputs directory.
+        archive_dir: Destination archive directory.
+
+    Returns:
+        Tuple of (archived_input_video_path, list_of_archived_batch_paths).
+    """
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    archived_video: Path | None = None
+    archived_batches: list[Path] = []
+
+    # 1. Move input video
+    if input_video.is_file():
+        archived_video = _safe_move_to_archive(input_video, archive_dir)
+        print(f"      Archived video : {input_video.name} -> {archived_video.name}")
+
+    # 2. Identify and move top-level batch folders/files under gradio_outputs_dir
+    seen_items: set[Path] = set()
+    items_to_move: list[Path] = []
+
+    for mp3 in mp3_files:
+        try:
+            rel = mp3.resolve().relative_to(gradio_outputs_dir.resolve())
+            top_item = gradio_outputs_dir / rel.parts[0]
+        except (ValueError, IndexError):
+            top_item = mp3.parent if mp3.parent != gradio_outputs_dir else mp3
+
+        if top_item != gradio_outputs_dir and top_item.exists() and top_item not in seen_items:
+            seen_items.add(top_item)
+            items_to_move.append(top_item)
+
+    for item in items_to_move:
+        dest = _safe_move_to_archive(item, archive_dir)
+        archived_batches.append(dest)
+        item_type = "folder" if dest.is_dir() else "file"
+        print(f"      Archived batch {item_type}: {item.name} -> {dest.name}")
+
+    return archived_video, archived_batches
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -962,10 +1058,15 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip step 3: visible-mark and SynthID cleanup.",
     )
+    parser.add_argument(
+        "--no-archive",
+        action="store_true",
+        help="Skip moving used input video and gradio_outputs to archive.",
+    )
     return parser.parse_args()
 
 
-def main(*, step_3_enabled: bool = True) -> None:
+def main(*, step_3_enabled: bool = True, archive_enabled: bool = True) -> None:
     """Orchestrate probes, optional watermark cleanup, upscale, audio concat, and muxing.
 
     Args:
@@ -1105,13 +1206,24 @@ def main(*, step_3_enabled: bool = True) -> None:
         f"\n[OK] Done in {_format_seconds(total_elapsed)} ({total_elapsed:.1f}s)!  "
         f"({size_mb:.1f} MB)\n    {final_output}"
     )
+
+    # 7. Archive source inputs
+    if archive_enabled:
+        print("\n[Archiving] Moving used inputs to archive...")
+        archive_sources(
+            input_video=input_video,
+            mp3_files=mp3_files,
+            gradio_outputs_dir=GRADIO_OUTPUTS_DIR,
+            archive_dir=ARCHIVE_DIR,
+        )
+
     print("=" * 60)
 
 
 if __name__ == "__main__":
     try:
         args = _parse_args()
-        main(step_3_enabled=not args.off_step_3)
+        main(step_3_enabled=not args.off_step_3, archive_enabled=not args.no_archive)
     except (FileNotFoundError, RuntimeError) as exc:
         print(f"\n[ERROR] {exc}", file=sys.stderr)
         sys.exit(1)
