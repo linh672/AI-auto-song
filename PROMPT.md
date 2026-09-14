@@ -15,7 +15,7 @@ Lo-fi hip hop and chillhop with laid-back swung drums, mellow piano loops, soft 
 
 
 conda activate video_creation
-python -m acestep.acestep_v15_pipeline
+python -m acestep.acestep_v15_pipeline (best)
 python make_video.py 
 
 
