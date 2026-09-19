@@ -1063,14 +1063,31 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip moving used input video and gradio_outputs to archive.",
     )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=100,
+        help="Number of audio files per video in batch mode (default: 100).",
+    )
     return parser.parse_args()
 
 
-def main(*, step_3_enabled: bool = True, archive_enabled: bool = True) -> None:
+def main(
+    *,
+    step_3_enabled: bool = True,
+    archive_enabled: bool = True,
+    input_video: Path | None = None,
+    mp3_files: list[Path] | None = None,
+    output_dir: Path | None = None,
+) -> None:
     """Orchestrate probes, optional watermark cleanup, upscale, audio concat, and muxing.
 
     Args:
         step_3_enabled: Whether to run visible-mark and SynthID cleanup in step 3.
+        archive_enabled: Whether to move used inputs to archive after rendering.
+        input_video: Specific input video path. Auto-discovered from input/ if None.
+        mp3_files: Specific list of audio files. Auto-collected from gradio_outputs/ if None.
+        output_dir: Output directory for the final MP4. Defaults to output/ if None.
     """
     start_total_time = time.perf_counter()
     print("=" * 60)
@@ -1078,7 +1095,8 @@ def main(*, step_3_enabled: bool = True, archive_enabled: bool = True) -> None:
     print("=" * 60)
 
     _require_ffmpeg()
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    effective_output_dir = output_dir or OUTPUT_DIR
+    effective_output_dir.mkdir(parents=True, exist_ok=True)
 
     # Detect GPU encoder
     driver = _nvidia_driver_version()
@@ -1097,11 +1115,15 @@ def main(*, step_3_enabled: bool = True, archive_enabled: bool = True) -> None:
         print("  CPU encoder : libx264 (16 threads, i9-14HX)")
 
     # 1. Collect MP3s & probe files
-    print(f"\n[1/6] Scanning for MP3 files in:\n      {GRADIO_OUTPUTS_DIR}")
-    mp3_files = _collect_mp3s(GRADIO_OUTPUTS_DIR)
+    if mp3_files is None:
+        print(f"\n[1/6] Scanning for MP3 files in:\n      {GRADIO_OUTPUTS_DIR}")
+        mp3_files = _collect_mp3s(GRADIO_OUTPUTS_DIR)
+    else:
+        print(f"\n[1/6] Using {len(mp3_files)} pre-selected audio file(s).")
 
     # Probe input video and all MP3s in PARALLEL
-    input_video = _find_input_video(INPUT_DIR)
+    if input_video is None:
+        input_video = _find_input_video(INPUT_DIR)
     all_probe_targets = mp3_files + [input_video]
     print(f"      Probing {len(all_probe_targets)} files in parallel"
           f" ({min(len(all_probe_targets), CPU_THREADS)} workers)...")
@@ -1174,7 +1196,7 @@ def main(*, step_3_enabled: bool = True, archive_enabled: bool = True) -> None:
         print(f"      Done in {time.perf_counter() - t1:.1f}s")
 
         # 6. Loop video + merge audio in ONE fast stream-copy pass
-        final_output = OUTPUT_DIR / f"{timestamp}_final.mp4"
+        final_output = effective_output_dir / f"{timestamp}_final.mp4"
         print(f"\n[6/6] Loop video ({_format_seconds(video_duration)} x~{plays}) + merge audio (stream copy - zero re-encode)")
         print(f"      Source video : {ready_video.name}")
         print("      Video stream : copy (lossless, instant via MPEG-TS)")
@@ -1223,7 +1245,12 @@ def main(*, step_3_enabled: bool = True, archive_enabled: bool = True) -> None:
 if __name__ == "__main__":
     try:
         args = _parse_args()
-        main(step_3_enabled=not args.off_step_3, archive_enabled=not args.no_archive)
+        from batch_video import batch_main
+
+        batch_main(
+            batch_size=args.batch_size,
+            step_3_enabled=not args.off_step_3,
+        )
     except (FileNotFoundError, RuntimeError) as exc:
         print(f"\n[ERROR] {exc}", file=sys.stderr)
         sys.exit(1)
