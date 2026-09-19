@@ -1134,18 +1134,18 @@ def main(*, step_3_enabled: bool = True, archive_enabled: bool = True) -> None:
         clean_stage_video = strip_container_metadata(input_video, meta_cleaned_video)
         print(f"      Metadata stripped in {time.perf_counter() - t_meta:.2f}s")
 
-        # 3. Visible-mark and SynthID cleanup through remove-ai-watermarks.
-        if step_3_enabled:
-            print(
-                "\n[3/6] Removing visible marks and SynthID "
-                f"(noise {WATERMARK_NOISE_STD}, {WATERMARK_FPS} fps, "
-                f"long side {WATERMARK_LONG_SIDE})..."
-            )
-            t_clean = time.perf_counter()
-            clean_stage_video = _remove_video_watermarks(clean_stage_video, deep_cleaned_video)
-            print(f"      Watermark cleaning finished in {time.perf_counter() - t_clean:.1f}s")
-        else:
-            print("\n[3/6] Watermark cleanup disabled (--off-step-3).")
+        # 3. Visible-mark and SynthID cleanup through remove-ai-watermarks (temporarily commented out).
+        # if step_3_enabled:
+        #     print(
+        #         "\n[3/6] Removing visible marks and SynthID "
+        #         f"(noise {WATERMARK_NOISE_STD}, {WATERMARK_FPS} fps, "
+        #         f"long side {WATERMARK_LONG_SIDE})..."
+        #     )
+        #     t_clean = time.perf_counter()
+        #     clean_stage_video = _remove_video_watermarks(clean_stage_video, deep_cleaned_video)
+        #     print(f"      Watermark cleaning finished in {time.perf_counter() - t_clean:.1f}s")
+        # else:
+        #     print("\n[3/6] Watermark cleanup disabled (--off-step-3).")
 
         # 4. Enhance / upscale input video to 1080p if needed
         print("\n[4/6] Enhancing input video to 1080p (if needed)...")
