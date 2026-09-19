@@ -79,7 +79,7 @@ class TestArchiveBatchFiles(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_moves_video_and_audio(self) -> None:
-        """Input video and audio files are moved into the batch archive."""
+        """Input video and audio folders are moved into the batch archive."""
         video = self.root / "input" / "clip.mp4"
         video.parent.mkdir()
         video.write_bytes(b"video_data")
@@ -98,10 +98,43 @@ class TestArchiveBatchFiles(unittest.TestCase):
         self.assertTrue((self.batch_dir / "clip.mp4").exists())
         self.assertFalse(video.exists())
 
-        # Audio moved to used_audio/
+        # Folder moved to used_audio/batch_001/
         used_audio_dir = self.batch_dir / "used_audio"
         self.assertTrue(used_audio_dir.is_dir())
-        self.assertEqual(len(list(used_audio_dir.iterdir())), 3)
+        self.assertTrue((used_audio_dir / "batch_001").is_dir())
+        self.assertEqual(len(list(used_audio_dir.rglob("*.mp3"))), 3)
+        self.assertFalse(audio_dir.exists())
+
+    def test_moves_entire_folder_with_sidecars(self) -> None:
+        """Entire folder with audio, json, npy, and session sidecars is moved."""
+        video = self.root / "input" / "v.mp4"
+        video.parent.mkdir(parents=True, exist_ok=True)
+        video.write_bytes(b"v")
+
+        batch_folder = self.root / "gradio_outputs" / "batch_1788987058"
+        batch_folder.mkdir(parents=True, exist_ok=True)
+        (batch_folder / "uuid.mp3").write_bytes(b"mp3")
+        (batch_folder / "uuid.json").write_bytes(b"{}")
+        (batch_folder / "uuid.repaint_latents.npy").write_bytes(b"npy")
+        (batch_folder / "uuid.session.npz").write_bytes(b"npz")
+
+        _archive_batch_files(
+            video,
+            [batch_folder / "uuid.mp3"],
+            self.batch_dir,
+            gradio_outputs_dir=self.root / "gradio_outputs",
+        )
+
+        # Batch folder moved completely out of gradio_outputs
+        self.assertFalse(batch_folder.exists())
+
+        # Folder and all 4 files are present in used_audio/
+        dest_folder = self.batch_dir / "used_audio" / "batch_1788987058"
+        self.assertTrue(dest_folder.is_dir())
+        self.assertTrue((dest_folder / "uuid.mp3").is_file())
+        self.assertTrue((dest_folder / "uuid.json").is_file())
+        self.assertTrue((dest_folder / "uuid.repaint_latents.npy").is_file())
+        self.assertTrue((dest_folder / "uuid.session.npz").is_file())
 
     def test_cleans_empty_parent_dirs(self) -> None:
         """Empty parent directories of moved audio files are cleaned up."""
@@ -115,7 +148,7 @@ class TestArchiveBatchFiles(unittest.TestCase):
 
         _archive_batch_files(video, [f], self.batch_dir)
 
-        # The now-empty batch folder should be removed
+        # The batch folder should be moved, leaving nothing under gradio_outputs
         self.assertFalse(audio_dir.exists())
 
 

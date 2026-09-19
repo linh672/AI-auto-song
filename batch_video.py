@@ -2,29 +2,13 @@
 """batch_video.py - Batch-process all input videos with audio from gradio_outputs.
 
 Loops through every MP4 in ``input/``, processing each with exactly
-BATCH_SIZE audio files from ``gradio_outputs/``.  Each batch renders
-a final video directly into a dedicated archive subfolder and safely
-moves used source files after successful completion.
-
-Usage::
-
-    python batch_video.py
-    python batch_video.py --batch-size 50
-    python batch_video.py --off-step-3
-
-Archive structure per batch::
-
-    archive/<video_stem>_batch_<timestamp>/
-        <timestamp>_final.mp4        # rendered output
-        <video_name>.mp4             # used input video
-        used_audio/                  # 100 consumed audio files
-            batch_001/track_01.mp3
-            ...
+BATCH_SIZE audio files from ``gradio_outputs/``. Each batch renders
+a final video directly into a dedicated archive subfolder and moves
+used source files and folders after successful completion.
 """
 from __future__ import annotations
 
 import argparse
-import shutil
 import sys
 import time
 from pathlib import Path
@@ -43,27 +27,12 @@ BATCH_SIZE = 100
 
 
 def _list_input_videos(input_dir: Path) -> list[Path]:
-    """Return all MP4 files in *input_dir*, sorted alphabetically.
-
-    Args:
-        input_dir: Directory containing input video files.
-
-    Returns:
-        Sorted list of MP4 paths (may be empty).
-    """
+    """Return all MP4 files in *input_dir*, sorted alphabetically."""
     return sorted(input_dir.glob("*.mp4"))
 
 
 def _take_batch(pool: list[Path], size: int) -> list[Path]:
-    """Remove and return the first *size* items from *pool* in-place.
-
-    Args:
-        pool: Mutable list of available audio file paths.
-        size: Number of items to take.
-
-    Returns:
-        List of exactly *size* paths taken from the front of *pool*.
-    """
+    """Remove and return the first *size* items from *pool* in-place."""
     batch = pool[:size]
     del pool[:size]
     return batch
@@ -73,34 +42,59 @@ def _archive_batch_files(
     input_video: Path,
     used_audio: list[Path],
     batch_dir: Path,
+    gradio_outputs_dir: Path = GRADIO_OUTPUTS_DIR,
 ) -> None:
-    """Move the used input video and audio files into the batch archive folder.
+    """Move used input video and audio folders into the batch archive.
 
     Args:
         input_video: Source video file to archive.
         used_audio: Audio files consumed by this batch.
         batch_dir: Destination archive directory for this batch.
+        gradio_outputs_dir: Directory containing generated audio files.
     """
-    # Move input video into batch archive root
     _safe_move_to_archive(input_video, batch_dir)
     print(f"      Archived video  : {input_video.name}")
 
-    # Move audio files into used_audio/ subfolder
     audio_dst = batch_dir / "used_audio"
     audio_dst.mkdir(parents=True, exist_ok=True)
-    for audio_file in used_audio:
-        _safe_move_to_archive(audio_file, audio_dst)
 
-    # Clean up empty parent directories left behind in gradio_outputs
+    used_set = {f.resolve() for f in used_audio}
+    moved_items: set[Path] = set()
+
+    for audio_file in used_audio:
+        try:
+            rel = audio_file.resolve().relative_to(gradio_outputs_dir.resolve())
+            top_item = gradio_outputs_dir / rel.parts[0]
+        except (ValueError, IndexError):
+            top_item = audio_file.parent if audio_file.parent != gradio_outputs_dir else audio_file
+
+        if top_item == gradio_outputs_dir or not top_item.exists() or top_item in moved_items:
+            continue
+
+        if top_item.is_dir():
+            remaining_mp3s = {p.resolve() for p in top_item.rglob("*.mp3")} - used_set
+            if not remaining_mp3s:
+                _safe_move_to_archive(top_item, audio_dst)
+                moved_items.add(top_item)
+            else:
+                target_sub = audio_dst / top_item.name
+                target_sub.mkdir(parents=True, exist_ok=True)
+                for sidecar in top_item.glob(f"{audio_file.stem}.*"):
+                    _safe_move_to_archive(sidecar, target_sub)
+                moved_items.add(audio_file)
+        else:
+            _safe_move_to_archive(top_item, audio_dst)
+            moved_items.add(top_item)
+
     for audio_file in used_audio:
         parent = audio_file.parent
         try:
-            if parent.exists() and not any(parent.iterdir()):
+            if parent.exists() and parent != gradio_outputs_dir and not any(parent.iterdir()):
                 parent.rmdir()
         except OSError:
             pass
 
-    print(f"      Archived audio  : {len(used_audio)} files -> used_audio/")
+    print(f"      Archived audio  : {len(moved_items)} folders/files -> used_audio/")
 
 
 def _parse_batch_args() -> argparse.Namespace:
@@ -130,15 +124,7 @@ def batch_main(
     gradio_outputs_dir: Path = GRADIO_OUTPUTS_DIR,
     archive_dir: Path = ARCHIVE_DIR,
 ) -> None:
-    """Process all input videos in batches of *batch_size* audio files each.
-
-    Args:
-        batch_size: Number of audio files to use per video.
-        step_3_enabled: Whether to run watermark cleanup in step 3.
-        input_dir: Directory containing input MP4 videos.
-        gradio_outputs_dir: Directory containing generated audio files.
-        archive_dir: Root archive directory for completed batches.
-    """
+    """Process all input videos in batches of *batch_size* audio files each."""
     start = time.perf_counter()
     print("=" * 60)
     print("  ACE-Step - Batch Video Builder")
@@ -149,7 +135,6 @@ def batch_main(
         print("\n[INFO] No input videos found. Nothing to do.")
         return
 
-    # Collect full audio pool once; we slice from it per batch
     try:
         audio_pool = _collect_mp3s(gradio_outputs_dir)
     except FileNotFoundError:
@@ -160,22 +145,17 @@ def batch_main(
     print(f"  Audio files  : {len(audio_pool)}")
     print(f"  Batch size   : {batch_size}")
     max_batches = len(audio_pool) // batch_size
-    print(f"  Max batches  : {max_batches} (with {len(audio_pool) % batch_size} leftover)")
-    print()
+    print(f"  Max batches  : {max_batches} (with {len(audio_pool) % batch_size} leftover)\n")
 
     completed = 0
     for idx, video in enumerate(videos, 1):
         if len(audio_pool) < batch_size:
-            print(
-                f"[WARN] Only {len(audio_pool)} audio file(s) remain "
-                f"(need {batch_size}). Stopping batch loop."
-            )
+            print(f"[WARN] Only {len(audio_pool)} audio file(s) remain (need {batch_size}). Stopping batch loop.")
             break
 
         batch_audio = _take_batch(audio_pool, batch_size)
         timestamp = int(time.time())
-        batch_name = f"{video.stem}_batch_{timestamp}"
-        batch_dir = archive_dir / batch_name
+        batch_dir = archive_dir / f"{video.stem}_batch_{timestamp}"
         batch_dir.mkdir(parents=True, exist_ok=True)
 
         print("-" * 60)
@@ -195,13 +175,11 @@ def batch_main(
         except (FileNotFoundError, RuntimeError) as exc:
             print(f"\n[ERROR] Batch {idx} failed: {exc}", file=sys.stderr)
             print("        Skipping archive step — source files left in place.")
-            # Return unused audio to the pool so they aren't lost
             audio_pool = batch_audio + audio_pool
             continue
 
-        # Archive only after successful render
         try:
-            _archive_batch_files(video, batch_audio, batch_dir)
+            _archive_batch_files(video, batch_audio, batch_dir, gradio_outputs_dir=gradio_outputs_dir)
         except OSError as exc:
             print(f"\n[WARN] Archive step had errors: {exc}", file=sys.stderr)
 
@@ -218,7 +196,4 @@ def batch_main(
 
 if __name__ == "__main__":
     args = _parse_batch_args()
-    batch_main(
-        batch_size=args.batch_size,
-        step_3_enabled=not args.off_step_3,
-    )
+    batch_main(batch_size=args.batch_size, step_3_enabled=not args.off_step_3)
