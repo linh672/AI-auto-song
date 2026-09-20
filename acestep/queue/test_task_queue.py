@@ -91,6 +91,48 @@ class TestTaskQueueManager(unittest.TestCase):
         self.manager.resume()
         self.assertFalse(self.manager.is_paused())
 
+    def test_store_init_context_persists_params(self):
+        """Verify stored init params are held on the manager."""
+        params = {"project_root": "/project", "device": "cuda:0"}
+        self.manager.store_init_context(params)
+        self.assertEqual(self.manager._init_params, params)
+
+    def test_set_task_timeout_minimum_60s(self):
+        """Timeout cannot be set lower than 60 seconds."""
+        self.manager.set_task_timeout(30)
+        self.assertEqual(self.manager._task_timeout_seconds, 60)
+        self.manager.set_task_timeout(1200)
+        self.assertEqual(self.manager._task_timeout_seconds, 1200)
+
+    @patch("acestep.queue.startup_batch.build_default_batch_params")
+    def test_handle_task_timeout(self, mock_build_batch):
+        """Timed out task triggers PID termination and re-enqueues pending tasks."""
+        mock_build_batch.return_value = ("Batch Track", {"captions": "test"})
+        self.manager.store_init_context({
+            "batch_size": 1,
+            "batch_caption": "test",
+            "batch_lyrics": "",
+        })
+        task1 = self.manager.add_task(title="Running Task", params={})
+        task1.status = "running"
+        task2 = self.manager.add_task(title="Pending Task", params={})
+        task2.status = "pending"
+
+        mock_proc = MagicMock()
+        mock_proc.pid = 12345
+        mock_proc.is_alive.return_value = True
+        self.manager._worker_process = mock_proc
+
+        self.manager._handle_task_timeout(task1)
+
+        self.assertEqual(task1.status, "failed")
+        self.assertIn("Timeout", task1.error_message)
+        mock_proc.terminate.assert_called_once()
+        self.assertEqual(task2.status, "cancelled")
+        mock_build_batch.assert_called_once()
+        self.assertEqual(len(self.manager.get_tasks()), 3)
+        self.assertEqual(self.manager.get_tasks()[-1].title, "Batch Track")
+
     @patch("acestep.ui.gradio.events.queue_handlers.get_task_queue_manager")
     def test_select_task_returns_all_audio_outputs(self, mock_queue_manager):
         """Selecting a task returns all generated audio paths for display."""

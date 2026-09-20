@@ -146,6 +146,11 @@ def execute_task(
         ]
         task.generation_info = str(final_result[9]) if len(final_result) > 9 else ""
         generation_status = str(final_result[10]) if len(final_result) > 10 else ""
+
+        # Explicitly drop heavy intermediate tensors before GC
+        del final_result
+        del generator
+
         if not task.output_audio_paths:
             error_detail = generation_status or "Generation completed without producing audio."
             raise RuntimeError(error_detail)
@@ -163,3 +168,7 @@ def execute_task(
         task.error_message = str(exc)
         task.status_message = f"Error: {str(exc)}"
         logger.error(f"[TaskQueue] Task {task.id} failed: {exc}\n{traceback.format_exc()}")
+    finally:
+        from acestep.queue.task_subprocess import cleanup_task_memory
+
+        cleanup_task_memory()

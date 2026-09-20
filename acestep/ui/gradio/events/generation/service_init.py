@@ -234,6 +234,34 @@ def init_service_wrapper(
                 lyrics=lyrics,
             )
             status += f"\n\n✅ Auto-Batch: Enqueued {len(tasks)} tasks into generation queue."
+
+            # Store init context for subprocess model loading & timeout restart.
+            # All values are picklable primitives (Windows spawn safety).
+            from acestep.queue.task_queue_manager import get_task_queue_manager
+
+            qm = get_task_queue_manager()
+            qm.store_init_context({
+                "project_root": project_root,
+                "config_path": config_path,
+                "device": device,
+                "use_flash_attention": use_flash_attention,
+                "compile_model": compile_model,
+                "offload_to_cpu": offload_to_cpu,
+                "offload_dit_to_cpu": offload_dit_to_cpu,
+                "quantization": quant_value,
+                "use_mlx_dit": mlx_dit,
+                "vae_checkpoint": vae_checkpoint,
+                "init_llm": init_llm,
+                "lm_model_path": lm_model_path if init_llm else None,
+                "lm_backend": backend if init_llm else None,
+                "lm_device": (
+                    lm_device if init_llm and "lm_device" in locals() else None
+                ),
+                "lm_offload_to_cpu": offload_to_cpu if init_llm else False,
+                "batch_caption": captions,
+                "batch_lyrics": lyrics,
+                "batch_size": batch_value,
+            })
         else:
             logger.warning(
                 "[Auto-Batch] Skipped auto-batch enqueue: service initialization did not complete successfully."

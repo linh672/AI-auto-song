@@ -78,6 +78,10 @@ class _FakeVae:
         """Return self for test-only device transfer calls."""
         return self
 
+    def float(self):
+        """Return self for test-only dtype transfer calls."""
+        return self
+
 
 class _Host(GenerateMusicDecodeMixin):
     """Minimal decode-mixin host exposing deterministic state for assertions."""
