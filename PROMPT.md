@@ -33,3 +33,10 @@ python -m acestep.acestep_v15_pipeline --batch (best)
     },
     "terminal.integrated.defaultProfile.windows": "PowerShell"
 }
+
+
+
+change everything but keep the ghibli style and the dog
+
+
+give me prompt to animate this picture KEEP IT SIMPLE AND REALISTIC AS MUC AS POSSIBLE (AND THIS IS THE LOOP VIDEO)
