@@ -38,14 +38,16 @@ python -m acestep.acestep_v15_pipeline --batch (best)
 
 Change everything but keep the ghibli style and the dog (MAKE IT MORE NATURE BUT SIMPLE) (remove the mouth) (make the eye a little big bigger).
 
+animate this to make it become a video
 
 
+(give me prompt to animate this picture KEEP IT SIMPLE AND REALISTIC AS MUC AS POSSIBLE (AND THIS IS THE LOOP VIDEO)
 
-give me prompt to animate this picture KEEP IT SIMPLE AND REALISTIC AS MUC AS POSSIBLE (AND THIS IS THE LOOP VIDEO)
+
 
 add notice Notice: Clear atmosphere, crystal clear air, no fog, no mist, no smoke, no white haze patches across the trees 
 add notice: do not make anymated the sunlight focus on the objects for example: do not “Soft sunlight filters through the trees with floating dust motes”
 
 dont animate the mouth 
 
-animate some objects in the environment so it becomes more dynamic 
+animate some objects in the environment so it becomes more dynamic )
