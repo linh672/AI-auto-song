@@ -16,7 +16,7 @@ Lo-fi hip hop and chillhop with laid-back swung drums, mellow piano loops, soft 
 
 conda activate video_creation
 python -m acestep.acestep_v15_pipeline (best)
-python make_video.py 
+python make_video.py (best) 
 
 
 python -m acestep.acestep_v15_pipeline --batch (best)
@@ -59,6 +59,21 @@ animate some objects in the environment so it becomes more dynamic )
 
 
 
--add the first dog in the first picture into the second picture (the new picture ratio 16:9) (keep the ghibly style) and change the pose so the dog is more chill
+-add the first dog in the first picture into the second picture (the new picture ratio 16:9) and change the pose so the dog is more chill
 -give me prompt to animate this picture KEEP IT SIMPLE AND REALISTIC AS MUC AS POSSIBLE (AND THIS IS THE LOOP VIDEO)
 add notice Notice: Clear atmosphere, crystal clear air, no fog, no mist, no smoke, no white haze patches across the trees.
+-paraphase this also take the img context as a reference so it can be related to img
+Rainy Night Music | Jazz LoFi Beats | Deep Focus & Productivity — Rex Diary
+
+description
+Welcome to Rex Diary. Your cozy corner for deep focus, relaxation, and peaceful study sessions.
+
+If you are looking for background music to help you study, work, read, or simply unwind after a long day, hit play and let the relaxing beats guide you.
+
+What you will find here:
+
+Deep Focus & Productivity Lofi
+
+Chill Jazz Lofi Beats
+
+Cozy ambient sounds
