@@ -1,0 +1,273 @@
+- generic [ref=f19e1]:
+  - link "Skip to main content" [ref=f19e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - main [ref=f19e4]:
+    - generic [ref=f19e6]:
+      - generic [ref=f19e8]:
+        - generic [ref=f19e11]:
+          - generic [ref=f19e12]:
+            - navigation [ref=f19e14]:
+              - button "Home" [ref=f19e15] [cursor=pointer]:
+                - img [aria-hidden] [ref=f19e16]: home
+              - textbox "Editable text" [ref=f19e21]:
+                - /placeholder: ""
+                - text: Tháng 9 28 - 09:18
+            - button "More options for the project" [ref=f19e22] [cursor=pointer]:
+              - img [aria-hidden] [ref=f19e23]: more_vert
+          - generic [ref=f19e27]:
+            - generic [ref=f19e28]:
+              - button "Search" [ref=f19e29] [cursor=pointer]:
+                - img [aria-hidden] [ref=f19e30]: search
+              - textbox "Search" [ref=f19e32]
+            - button "Filtering and sorting options" [ref=f19e33] [cursor=pointer]:
+              - img [aria-hidden] [ref=f19e34]: filter_list
+          - generic [ref=f19e36]:
+            - generic [ref=f19e38]:
+              - button "Add media menu" [ref=f19e39] [cursor=pointer]:
+                - img [aria-hidden] [ref=f19e40]: add
+              - button "Product help" [ref=f19e42] [cursor=pointer]:
+                - img [aria-hidden] [ref=f19e43]: help
+              - button "Tile grid settings" [ref=f19e45] [cursor=pointer]:
+                - img [aria-hidden] [ref=f19e46]: settings_2
+              - button "More options" [ref=f19e49] [cursor=pointer]:
+                - img [aria-hidden] [ref=f19e50]: more_vert
+            - button "Account details" [ref=f19e53] [cursor=pointer]:
+              - generic "PRO tier" [ref=f19e55]: PRO
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - 'button "Google Account: Nhat Linh Dang (dangnhatlinh915@gmail.com), Google membership"'
+        - generic [ref=f19e57]:
+          - navigation "Project navigation" [ref=f19e62]:
+            - generic [ref=f19e63]:
+              - generic [ref=f19e64] [cursor=pointer]:
+                - img [aria-hidden] [ref=f19e65]: dashboard
+                - generic [ref=f19e66]: All media
+              - generic [ref=f19e67] [cursor=pointer]:
+                - img [aria-hidden] [ref=f19e68]: image
+                - generic [ref=f19e69]: Images
+              - generic [ref=f19e70] [cursor=pointer]:
+                - img [aria-hidden] [ref=f19e71]: videocam
+                - generic [ref=f19e72]: Videos
+              - generic [ref=f19e73] [cursor=pointer]:
+                - img [aria-hidden] [ref=f19e74]: accessibility_new
+                - generic [ref=f19e75]: Characters
+              - generic [ref=f19e76] [cursor=pointer]:
+                - img [aria-hidden] [ref=f19e77]: movie
+                - generic [ref=f19e78]: Scenes
+              - generic [ref=f19e79] [cursor=pointer]:
+                - img [aria-hidden] [ref=f19e80]: drive_folder_upload
+                - generic [ref=f19e81]: Uploads
+              - separator [ref=f19e82]
+              - link "Tools" [ref=f19e83] [cursor=pointer]:
+                - /url: /u/0/project/2a0986c0-3556-41b6-956e-d45046786417/tools
+                - img [aria-hidden] [ref=f19e84]: apps_spark_2
+            - generic [ref=f19e86]:
+              - generic [ref=f19e87] [cursor=pointer]:
+                - img [aria-hidden] [ref=f19e88]: delete
+                - generic [ref=f19e89]: Trash
+              - generic [ref=f19e91] [cursor=pointer]:
+                - img [aria-hidden] [ref=f19e92]: left_panel_close
+                - generic [ref=f19e93]: Collapse
+          - generic [ref=f19e96]:
+            - generic [ref=f19e101]:
+              - generic [ref=f19e102]:
+                - generic "lisa-yount-DUubGalK--I-unsplash.jpg":
+                  - img "Tile displaying a user's image" [ref=f19e106] [cursor=pointer]
+                - generic "Screenshot 2026-09-28 204705.png":
+                  - img "Tile displaying a user's image" [ref=f19e110] [cursor=pointer]
+              - generic [ref=f19e111]:
+                - generic "Black puppy resting in meadow":
+                  - generic [ref=f19e114] [cursor=pointer]:
+                    - img "Generated video thumbnail" [ref=f19e115]
+                    - generic:
+                      - generic:
+                        - img [aria-hidden]: play_circle
+                - generic "Add dog to second picture":
+                  - img "Tile displaying a user's image" [ref=f19e121] [cursor=pointer]
+              - generic [ref=f19e122]:
+                - generic "Adding dog to photo":
+                  - img "Tile displaying a user's image" [ref=f19e126] [cursor=pointer]
+                - generic "Adding dog to picture":
+                  - img "Tile displaying a user's image" [ref=f19e130] [cursor=pointer]
+              - generic [ref=f19e131]:
+                - generic "Relaxing Jazzy LoFi Instrumentals":
+                  - img "Tile displaying a user's image" [ref=f19e135] [cursor=pointer]
+                - generic "Listening to lofi music":
+                  - img "Tile displaying a user's image" [ref=f19e139] [cursor=pointer]
+              - generic [ref=f19e140]:
+                - generic "lisa-yount-DUubGalK--I-unsplash.jpg":
+                  - img "Tile displaying a user's image" [ref=f19e144] [cursor=pointer]
+                - generic "Screenshot 2026-09-28 204705.png":
+                  - img "Tile displaying a user's image" [ref=f19e148] [cursor=pointer]
+              - generic [ref=f19e149]:
+                - generic "Black dog resting in field":
+                  - generic [ref=f19e152] [cursor=pointer]:
+                    - img "Generated video thumbnail" [ref=f19e153]
+                    - generic:
+                      - generic:
+                        - img [aria-hidden]: play_circle
+                      - generic:
+                        - img [aria-hidden]: stacks
+                - generic "Black dog in field":
+                  - generic [ref=f19e158] [cursor=pointer]:
+                    - img "Generated video thumbnail" [ref=f19e159]
+                    - generic:
+                      - generic:
+                        - img [aria-hidden]: play_circle
+              - generic [ref=f19e162]:
+                - generic "Black dog in field":
+                  - generic [ref=f19e165] [cursor=pointer]:
+                    - img "Generated video thumbnail" [ref=f19e166]
+                    - generic:
+                      - generic:
+                        - img [aria-hidden]: play_circle
+                - generic "Puppy resting in grass":
+                  - generic [ref=f19e171] [cursor=pointer]:
+                    - img "Generated video thumbnail" [ref=f19e172]
+                    - generic:
+                      - generic:
+                        - img [aria-hidden]: play_circle
+              - generic [ref=f19e175]:
+                - generic "Puppy resting in grass":
+                  - generic [ref=f19e178] [cursor=pointer]:
+                    - img "Generated video thumbnail" [ref=f19e179]
+                    - generic:
+                      - generic:
+                        - img [aria-hidden]: play_circle
+                - generic "Black dog resting in grass":
+                  - generic [ref=f19e184] [cursor=pointer]:
+                    - img "Generated video thumbnail" [ref=f19e185]
+                    - generic:
+                      - generic:
+                        - img [aria-hidden]: play_circle
+              - generic [ref=f19e188]:
+                - generic "Black dog resting in grass":
+                  - generic [ref=f19e191] [cursor=pointer]:
+                    - img "Generated video thumbnail" [ref=f19e192]
+                    - generic:
+                      - generic:
+                        - img [aria-hidden]: play_circle
+                - generic "Black dog resting in field":
+                  - generic [ref=f19e197] [cursor=pointer]:
+                    - img "Generated video thumbnail" [ref=f19e198]
+                    - generic:
+                      - generic:
+                        - img [aria-hidden]: play_circle
+            - generic [ref=f19e208]:
+              - generic [ref=f19e210]:
+                - generic: What do you want to create?
+                - paragraph [ref=f19e213]
+              - generic [ref=f19e214]:
+                - button "Add ingredients to the prompt box" [expanded] [ref=f19e217] [cursor=pointer]:
+                  - img [aria-hidden] [ref=f19e218]: close
+                - button "Agent" [ref=f19e222] [cursor=pointer]
+                - generic [ref=f19e224]:
+                  - button "Settings trigger" [ref=f19e225]:
+                    - generic [ref=f19e227]:
+                      - text: 🍌 Nano Banana 2
+                      - img [aria-hidden] [ref=f19e228]: crop_16_9
+                      - text: x2
+                  - generic [ref=f19e230]:
+                    - button "Start generation" [disabled]:
+                      - img [aria-hidden]: arrow_forward
+      - generic:
+        - paragraph: Google Flow can make mistakes, so double check it
+  - generic [ref=f19e236]:
+    - generic [ref=f19e237]:
+      - combobox "Select project" [ref=f19e238] [cursor=pointer]:
+        - generic [ref=f19e239]: Tháng 9 28 - 09:18
+      - tablist "Category navigation" [ref=f19e246]:
+        - tab "All" [selected] [ref=f19e247] [cursor=pointer]:
+          - img [aria-hidden] [ref=f19e248]: dashboard
+        - tab "Images" [ref=f19e251] [cursor=pointer]:
+          - img [aria-hidden] [ref=f19e252]: image
+        - tab "Videos" [ref=f19e255] [cursor=pointer]:
+          - img [aria-hidden] [ref=f19e256]: videocam
+        - tab "Voices" [ref=f19e259] [cursor=pointer]:
+          - img [aria-hidden] [ref=f19e260]: voice_selection
+        - tab "Characters" [ref=f19e263] [cursor=pointer]:
+          - img [aria-hidden] [ref=f19e264]: accessibility_new
+        - tab "Uploads" [ref=f19e267] [cursor=pointer]:
+          - img [aria-hidden] [ref=f19e268]: drive_folder_upload
+      - button "Upload media" [ref=f19e272]:
+        - generic [ref=f19e274]:
+          - img [aria-hidden] [ref=f19e275]: upload
+          - generic [ref=f19e276]: Upload media
+    - generic [ref=f19e278]:
+      - banner [ref=f19e279]:
+        - generic [ref=f19e280]:
+          - img [aria-hidden] [ref=f19e281]: search
+          - textbox "Search assets" [active] [ref=f19e282]
+        - combobox "Sort assets" [ref=f19e283] [cursor=pointer]:
+          - generic [ref=f19e284]: Recent
+      - generic [ref=f19e291]:
+        - listbox "Asset list" [ref=f19e293]:
+          - generic [ref=f19e294]:
+            - option "lisa-yount-DUubGalK--I-unsplash.jpg Image" [ref=f19e296] [cursor=pointer]:
+              - generic [ref=f19e299]:
+                - generic [ref=f19e300]: lisa-yount-DUubGalK--I-unsplash.jpg
+                - generic [ref=f19e301]: Image
+            - option "Screenshot 2026-09-28 204705.png Image" [ref=f19e303] [cursor=pointer]:
+              - generic [ref=f19e306]:
+                - generic [ref=f19e307]: Screenshot 2026-09-28 204705.png
+                - generic [ref=f19e308]: Image
+            - option "Black puppy resting in meadow Video" [ref=f19e310] [cursor=pointer]:
+              - generic [ref=f19e313]:
+                - generic [ref=f19e314]: Black puppy resting in meadow
+                - generic [ref=f19e315]: Video
+            - option "Add dog to second picture Image" [ref=f19e317] [cursor=pointer]:
+              - generic [ref=f19e320]:
+                - generic [ref=f19e321]: Add dog to second picture
+                - generic [ref=f19e322]: Image
+            - option "lisa-yount-DUubGalK--I-unsplash.jpg Image" [ref=f19e324] [cursor=pointer]:
+              - generic [ref=f19e327]:
+                - generic [ref=f19e328]: lisa-yount-DUubGalK--I-unsplash.jpg
+                - generic [ref=f19e329]: Image
+            - option "Screenshot 2026-09-28 204705.png Image" [ref=f19e331] [cursor=pointer]:
+              - generic [ref=f19e334]:
+                - generic [ref=f19e335]: Screenshot 2026-09-28 204705.png
+                - generic [ref=f19e336]: Image
+            - option "Adding dog to picture Image" [ref=f19e338] [cursor=pointer]:
+              - generic [ref=f19e341]:
+                - generic [ref=f19e342]: Adding dog to picture
+                - generic [ref=f19e343]: Image
+            - option "Adding dog to photo Image" [ref=f19e345] [cursor=pointer]:
+              - generic [ref=f19e348]:
+                - generic [ref=f19e349]: Adding dog to photo
+                - generic [ref=f19e350]: Image
+            - option "Listening to lofi music Image" [ref=f19e352] [cursor=pointer]:
+              - generic [ref=f19e355]:
+                - generic [ref=f19e356]: Listening to lofi music
+                - generic [ref=f19e357]: Image
+            - option "Relaxing Jazzy LoFi Instrumentals Image" [ref=f19e359] [cursor=pointer]:
+              - generic [ref=f19e362]:
+                - generic [ref=f19e363]: Relaxing Jazzy LoFi Instrumentals
+                - generic [ref=f19e364]: Image
+            - option "Black dog in field Video" [ref=f19e366] [cursor=pointer]:
+              - generic [ref=f19e369]:
+                - generic [ref=f19e370]: Black dog in field
+                - generic [ref=f19e371]: Video
+            - option "Black dog in field Video" [ref=f19e373] [cursor=pointer]:
+              - generic [ref=f19e376]:
+                - generic [ref=f19e377]: Black dog in field
+                - generic [ref=f19e378]: Video
+            - option "Gemini_Generated_Image_8a5j248a5j248a5j.jpg Image" [ref=f19e380] [cursor=pointer]:
+              - generic [ref=f19e383]:
+                - generic [ref=f19e384]: Gemini_Generated_Image_8a5j248a5j248a5j.jpg
+                - generic [ref=f19e385]: Image
+            - option "Puppy resting in grass Video" [ref=f19e387] [cursor=pointer]:
+              - generic [ref=f19e390]:
+                - generic [ref=f19e391]: Puppy resting in grass
+                - generic [ref=f19e392]: Video
+            - option "Puppy resting in grass Video" [ref=f19e394] [cursor=pointer]:
+              - generic [ref=f19e397]:
+                - generic [ref=f19e398]: Puppy resting in grass
+                - generic [ref=f19e399]: Video
+        - generic [ref=f19e401]:
+          - img "Preview of lisa-yount-DUubGalK--I-unsplash.jpg" [ref=f19e403]
+          - button "Add to prompt" [ref=f19e405]

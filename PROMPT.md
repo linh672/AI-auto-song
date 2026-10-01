@@ -59,7 +59,7 @@ animate some objects in the environment so it becomes more dynamic )
 
 
 
--add the first dog in the first picture into the second picture (the new picture ratio 16:9) and change the pose so the dog is more chill
+-add the first dog in the first picture into the second picture (the new picture ratio 16:9) and change the pose so the dog is more chill dont add any text
 -give me prompt to animate this picture KEEP IT SIMPLE AND REALISTIC AS MUC AS POSSIBLE (AND THIS IS THE LOOP VIDEO)
 add notice Notice: Clear atmosphere, crystal clear air, no fog, no mist, no smoke, no white haze patches across the trees.
 -paraphase this also take the img context as a reference so it can be related to img
@@ -77,3 +77,15 @@ Deep Focus & Productivity Lofi
 Chill Jazz Lofi Beats
 
 Cozy ambient sounds
+
+
+
+
+
+
+
+
+
+add the first dog in the first picture into the second picture (the new picture ratio 16:9) and change the pose so the dog is more chill dont add any text
+
+A seamless, subtle looping animation. The cute black puppy rests quietly on the ground in the meadow, showing only gentle, natural chest breathing and an occasional slow, sleepy blink, keeping its mouth completely still.

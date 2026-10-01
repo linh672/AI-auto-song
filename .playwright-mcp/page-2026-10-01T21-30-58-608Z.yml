@@ -1,0 +1,158 @@
+- generic [active] [ref=f31e1]:
+  - link "Skip to main content" [ref=f31e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - main [ref=f31e4]:
+    - generic [ref=f31e6]:
+      - generic [ref=f31e8]:
+        - generic [ref=f31e10]:
+          - navigation [ref=f31e13]:
+            - button "Back button to go to previous page" [ref=f31e14] [cursor=pointer]:
+              - img [aria-hidden] [ref=f31e15]: arrow_back
+            - textbox "Editable text" [ref=f31e20]:
+              - /placeholder: ""
+              - text: Black puppy resting in meadow
+          - generic [ref=f31e23]:
+            - generic [ref=f31e26]:
+              - button "Black puppy resting in meadow" [ref=f31e29] [cursor=pointer]:
+                - img "Black puppy resting in meadow"
+              - button "Dog added to second picture" [ref=f31e32] [cursor=pointer]:
+                - img "Dog added to second picture"
+              - button "Adding dog into picture" [ref=f31e35] [cursor=pointer]:
+                - img "Adding dog into picture"
+              - button "Adding dog to image" [ref=f31e38] [cursor=pointer]:
+                - img "Adding dog to image"
+              - button "lisa-yount-DUubGalK--I-unsplash.jpg" [ref=f31e41] [cursor=pointer]:
+                - img "lisa-yount-DUubGalK--I-unsplash.jpg"
+              - button "Screenshot 2026-09-28 204705.png" [ref=f31e44] [cursor=pointer]:
+                - img "Screenshot 2026-09-28 204705.png"
+              - button "Black puppy resting in meadow" [ref=f31e47] [cursor=pointer]:
+                - img "Black puppy resting in meadow"
+              - button "Add dog to second picture" [ref=f31e50] [cursor=pointer]:
+                - img "Add dog to second picture"
+              - button "Adding dog to photo" [ref=f31e53] [cursor=pointer]:
+                - img "Adding dog to photo"
+              - button "Adding dog to picture" [ref=f31e56] [cursor=pointer]:
+                - img "Adding dog to picture"
+              - button "Relaxing Jazzy LoFi Instrumentals" [ref=f31e59] [cursor=pointer]:
+                - img "Relaxing Jazzy LoFi Instrumentals"
+              - button "Listening to lofi music" [ref=f31e62] [cursor=pointer]:
+                - img "Listening to lofi music"
+              - button "lisa-yount-DUubGalK--I-unsplash.jpg" [ref=f31e65] [cursor=pointer]:
+                - img "lisa-yount-DUubGalK--I-unsplash.jpg"
+              - button "Screenshot 2026-09-28 204705.png" [ref=f31e68] [cursor=pointer]:
+                - img "Screenshot 2026-09-28 204705.png"
+              - button "Black dog resting in field" [ref=f31e71] [cursor=pointer]:
+                - img "Black dog resting in field"
+              - button "Black dog in field" [ref=f31e74] [cursor=pointer]:
+                - img "Black dog in field"
+              - button "Black dog in field" [ref=f31e77] [cursor=pointer]:
+                - img "Black dog in field"
+              - button "Puppy resting in grass" [ref=f31e80] [cursor=pointer]:
+                - img "Puppy resting in grass"
+              - button "Puppy resting in grass" [ref=f31e83] [cursor=pointer]:
+                - img "Puppy resting in grass"
+              - button "Black dog resting in grass" [ref=f31e86] [cursor=pointer]:
+                - img "Black dog resting in grass"
+              - button "Black dog resting in grass" [ref=f31e89] [cursor=pointer]:
+                - img "Black dog resting in grass"
+              - button "Black dog resting in field" [ref=f31e92] [cursor=pointer]:
+                - img "Black dog resting in field"
+              - button "Black dog resting at sunset" [ref=f31e95] [cursor=pointer]:
+                - img "Black dog resting at sunset"
+              - button "Black dog resting at sunset" [ref=f31e98] [cursor=pointer]:
+                - img "Black dog resting at sunset"
+            - button "Next media":
+              - img [aria-hidden]: arrow_right
+          - generic [ref=f31e101]:
+            - button "Favorite" [ref=f31e102] [cursor=pointer]:
+              - img [aria-hidden] [ref=f31e103]: favorite
+            - button "Share" [ref=f31e105] [cursor=pointer]:
+              - img [aria-hidden] [ref=f31e106]: share
+            - button "Download media" [ref=f31e108] [cursor=pointer]:
+              - img [aria-hidden] [ref=f31e109]: download
+            - button "Move to trash" [ref=f31e111] [cursor=pointer]:
+              - img [aria-hidden] [ref=f31e112]: delete
+            - button "Hide history" [expanded] [ref=f31e114]:
+              - img [aria-hidden] [ref=f31e115]: history
+            - button "More options" [ref=f31e119] [cursor=pointer]:
+              - img [aria-hidden] [ref=f31e120]: more_vert
+            - button "Done editing scene" [ref=f31e122]:
+              - generic [ref=f31e123]: Done
+        - generic [ref=f31e125]:
+          - generic [ref=f31e126]:
+            - generic [ref=f31e127]:
+              - generic [ref=f31e129]:
+                - img "Scene video preview" [ref=f31e130]
+                - img "Scene video poster"
+                - button "Save frame" [ref=f31e131] [cursor=pointer]:
+                  - img [aria-hidden] [ref=f31e132]: add_photo_alternate
+              - generic [ref=f31e135]:
+                - button "Mute" [ref=f31e136] [cursor=pointer]:
+                  - img [aria-hidden] [ref=f31e137]: volume_up
+                - generic [ref=f31e139]:
+                  - generic [ref=f31e140]: "Current time:"
+                  - text: 00:00:00
+                - button "Skip to previous clip" [ref=f31e141] [cursor=pointer]:
+                  - img [aria-hidden] [ref=f31e142]: skip_previous
+                - button "Play" [ref=f31e144] [cursor=pointer]:
+                  - img [aria-hidden] [ref=f31e145]: play_arrow
+                - button "Skip to next clip" [ref=f31e147] [cursor=pointer]:
+                  - img [aria-hidden] [ref=f31e148]: skip_next
+                - generic [ref=f31e150]:
+                  - generic [ref=f31e151]: "Total duration:"
+                  - text: 00:00:00
+                - button "Full screen" [ref=f31e152] [cursor=pointer]:
+                  - img [aria-hidden] [ref=f31e153]: fullscreen
+                - button "Disable loop" [pressed] [ref=f31e155] [cursor=pointer]:
+                  - img [aria-hidden] [ref=f31e156]: repeat
+            - generic [ref=f31e163]:
+              - img "Generated video thumbnail" [ref=f31e167] [cursor=pointer]
+              - button "Ingredient" [ref=f31e173] [cursor=pointer]:
+                - generic [ref=f31e174]:
+                  - img "Ingredient image"
+                - img [aria-hidden] [ref=f31e176]: add
+              - generic [ref=f31e178]:
+                - generic [ref=f31e179]: A seamless, subtle looping animation. The cute black puppy rests quietly on the ground in the meadow, showing only gentle, natural chest breathing and an occasional slow, sleepy blink, keeping its mouth completely still.
+                - generic [ref=f31e180]:
+                  - button "Reuse prompt" [ref=f31e181] [cursor=pointer]:
+                    - img [aria-hidden] [ref=f31e182]: keyboard_return
+                  - button "Expand prompt" [ref=f31e184] [cursor=pointer]:
+                    - img [aria-hidden] [ref=f31e185]: keyboard_arrow_down
+          - generic [ref=f31e188]:
+            - generic [ref=f31e189]:
+              - generic [ref=f31e190]:
+                - generic [ref=f31e191]: "00"
+                - generic [ref=f31e193]: "01"
+                - generic [ref=f31e195]: "02"
+                - generic [ref=f31e197]: "03"
+                - generic [ref=f31e199]: "04"
+                - generic [ref=f31e201]: "05"
+                - generic [ref=f31e203]: "06"
+                - generic [ref=f31e205]: "07"
+                - generic [ref=f31e207]: "08"
+                - generic [ref=f31e209]: "09"
+                - generic [ref=f31e211]: "10"
+                - generic [ref=f31e213]: "11"
+              - button "Add clip" [ref=f31e222] [cursor=pointer]:
+                - img [aria-hidden] [ref=f31e223]: add_2
+            - generic [ref=f31e225]:
+              - button "Zoom out" [ref=f31e226] [cursor=pointer]:
+                - img [aria-hidden] [ref=f31e227]: zoom_out
+              - button "Zoom in" [disabled]:
+                - img [aria-hidden]: zoom_in
+          - generic [ref=f31e233]:
+            - generic [ref=f31e235]:
+              - generic: Describe how to edit this video…
+              - paragraph [ref=f31e238]
+            - generic [ref=f31e239]:
+              - button "Add ingredients to the prompt box" [ref=f31e242] [cursor=pointer]:
+                - img [aria-hidden] [ref=f31e243]: add
+              - generic [ref=f31e246]:
+                - generic [ref=f31e247]:
+                  - img [aria-hidden] [ref=f31e248]: pen_magic
+                  - generic [ref=f31e249]: Omni 1.1 Flash
+                - generic [ref=f31e250]:
+                  - button "Start generation" [disabled]:
+                    - img [aria-hidden]: arrow_forward
+      - generic:
+        - paragraph: Google Flow can make mistakes, so double check it
