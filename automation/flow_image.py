@@ -179,10 +179,27 @@ def create_composite_image(
     
     # Click New Project if we are on the homepage
     try:
-        new_project = page.locator(UI_SELECTORS["new_project_btn"]).first
-        new_project.wait_for(state="visible", timeout=10000)
-        new_project.click(force=True)
-        logger.info("Clicked 'New project'")
+        # Evaluate via JS to avoid Playwright's unicode selector crashes on Windows
+        page.wait_for_timeout(3000) # Wait for homepage to load
+        clicked = page.evaluate('''() => {
+            const btns = Array.from(document.querySelectorAll('button, a, div[role="button"]'));
+            const btn = btns.find(b => {
+                const txt = b.textContent || '';
+                return txt.includes('New project') || txt.includes('Dự án mới');
+            });
+            if (btn) {
+                btn.click();
+                return true;
+            }
+            return false;
+        }''')
+        if clicked:
+            logger.info("Clicked 'New project'")
+        else:
+            logger.warning("Could not find 'New project' button via JS, saving debug_home.html")
+            with open("debug_home.html", "w", encoding="utf-8") as f:
+                f.write(page.content())
+
     except Exception as e:
         logger.warning(f"Failed to click 'New project': {e}")
 

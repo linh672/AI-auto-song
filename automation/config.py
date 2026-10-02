@@ -71,7 +71,7 @@ UI_SELECTORS = {
     "cookie_ok": 'button:has-text("OK, got it")',
 
     # --- Homepage ---
-    "new_project_btn": 'text="New project"',
+    "new_project_btn": 'text=/(New project|Dự án mới)/i',
 
     # --- Prompt area (bottom bar) ---
     "prompt_paragraph": '[contenteditable="true"]',

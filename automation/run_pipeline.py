@@ -30,7 +30,7 @@ from automation.flow_video import create_video_from_image
 # ---------------------------------------------------------------------------
 # Browser configuration (Windows-specific)
 # ---------------------------------------------------------------------------
-USER_DATA_DIR = r"C:\FlowBotProfile_Account2"
+USER_DATA_DIR = r"C:\FlowBotProfile_Account3"
 CHROME_ARGS = [
     "--disable-blink-features=AutomationControlled",
     "--disable-infobars",
