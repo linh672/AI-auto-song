@@ -95,18 +95,29 @@ def download_video(page: Page, output_path: Path) -> Path:
     
     dismiss_popups(page)
 
-    # Click the most recent generated video tile to open detail view
     video_tile = page.locator(UI_SELECTORS["generated_video"]).first
-    if video_tile.is_visible(timeout=5000):
+    try:
+        video_tile.wait_for(state="visible", timeout=10000)
         logger.info("Opening detail view for the generated video...")
-        video_tile.click()
+        video_tile.click(force=True)
         page.wait_for_timeout(3000)  # Wait for detail view to animate in
+    except Exception as e:
+        logger.warning(f"Video tile not visible: {e}")
 
     dismiss_popups(page)
 
     # Click the "Download media" button in the top right
-    page.locator(UI_SELECTORS["download_btn"]).click()
-    page.wait_for_timeout(1000)
+    download_btn = page.locator(UI_SELECTORS["download_btn"])
+    try:
+        download_btn.wait_for(state="visible", timeout=5000)
+        download_btn.click()
+        page.wait_for_timeout(1000)
+    except Exception as e:
+        logger.error("Could not find download button! Saving debug DOM and screenshot...")
+        page.screenshot(path="error_download_btn.png")
+        with open("error_download_dom.html", "w", encoding="utf-8") as f:
+            f.write(page.content())
+        raise e
 
     # Click 720p to trigger the Playwright-managed download
     logger.info("Clicking 720p option to trigger native download...")
@@ -114,7 +125,7 @@ def download_video(page: Page, output_path: Path) -> Path:
     # We wrap in try-except because clicking this often causes Playwright to throw 
     # "Target page closed" immediately. We catch it and just poll the filesystem.
     try:
-        page.locator(UI_SELECTORS["download_720p_option"]).first.click()
+        page.locator(UI_SELECTORS["download_720p_option"]).first.click(force=True)
     except Exception as e:
         logger.warning("Clicking 720p threw an error (expected if context closes): {}", e)
     
@@ -129,7 +140,7 @@ def download_video(page: Page, output_path: Path) -> Path:
     else:
         # Fallback: Check if Playwright managed to save an .mp4 after all
         recent_mp4s = sorted(OUTPUT_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
-        if recent_mp4s and (time.time() - recent_mp4s[0].stat().st_mtime < 60):
+        if recent_mp4s and (time.time() - recent_mp4s[0].stat().st_mtime < 120):
             logger.info("Found an automatically completed .mp4 file.")
             if recent_mp4s[0].resolve() != output_path.resolve():
                 if output_path.exists():

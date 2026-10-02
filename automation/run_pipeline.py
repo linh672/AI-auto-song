@@ -6,6 +6,7 @@ image → video → download workflow for each. Failures are isolated
 per-background so one error does not crash the entire pipeline.
 """
 
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -17,6 +18,7 @@ from automation.config import (
     BACKGROUND_DIR,
     CHARACTER_DIR,
     COOLDOWN_BETWEEN_ITERATIONS,
+    FLOW_URL,
     IMAGE_EXTENSIONS,
     OUTPUT_DIR,
     PROGRESS_LOG,
@@ -42,6 +44,21 @@ CHROME_ARGS = [
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _kill_chrome() -> None:
+    """Force-kill all Chrome processes to release the profile lock."""
+    subprocess.run(
+        ["taskkill", "/F", "/IM", "chrome.exe", "/T"],
+        capture_output=True,
+    )
+
+
+def _safe_close(ctx) -> None:
+    """Close a browser context, ignoring errors if already closed."""
+    try:
+        ctx.close()
+    except Exception:
+        pass
 
 def _get_character_image() -> Path:
     """Find the single character image in the character directory.
@@ -127,54 +144,58 @@ def run_pipeline() -> int:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     errors: list[str] = []
 
-    with sync_playwright() as pw:
-        context = pw.chromium.launch_persistent_context(
-            user_data_dir=USER_DATA_DIR,
-            channel="chrome",
-            headless=False,
-            args=CHROME_ARGS,
-            accept_downloads=True,
-            downloads_path=str(OUTPUT_DIR.resolve()),
-            viewport={"width": 1280, "height": 900},
+    for i, bg in enumerate(pending, 1):
+        logger.info(
+            "=== [{}/{}] Processing: {} ===",
+            i, len(pending), bg.name,
         )
-        page = context.pages[0] if context.pages else context.new_page()
+        try:
+            output_path = OUTPUT_DIR / (bg.stem + ".mp4")
+            _kill_chrome()
 
-        for i, bg in enumerate(pending, 1):
-            logger.info(
-                "=== [{}/{}] Processing: {} ===",
-                i, len(pending), bg.name,
-            )
-
-            try:
-                video_name = bg.stem + ".mp4"
-                output_path = OUTPUT_DIR / video_name
-
+            # Phase 1: Generate image + video
+            with sync_playwright() as pw:
+                ctx = pw.chromium.launch_persistent_context(
+                    user_data_dir=USER_DATA_DIR, channel="chrome",
+                    headless=False, args=CHROME_ARGS,
+                    viewport={"width": 1280, "height": 900},
+                )
+                page = ctx.pages[0] if ctx.pages else ctx.new_page()
                 create_composite_image(page, character, bg)
                 create_video_from_image(page)
+                _safe_close(ctx)
+
+            _kill_chrome()
+            time.sleep(2)
+
+            # Phase 2: Download with a fresh browser context
+            with sync_playwright() as pw:
+                ctx = pw.chromium.launch_persistent_context(
+                    user_data_dir=USER_DATA_DIR, channel="chrome",
+                    headless=False, args=CHROME_ARGS,
+                    accept_downloads=True,
+                    downloads_path=str(OUTPUT_DIR.resolve()),
+                    viewport={"width": 1280, "height": 900},
+                )
+                page = ctx.pages[0] if ctx.pages else ctx.new_page()
+                page.goto(FLOW_URL)
+                page.wait_for_timeout(5000)
                 download_video(page, output_path)
+                _safe_close(ctx)
 
-                _log_completion(bg.name)
-                logger.info("✓ Completed: {}", bg.name)
+            _kill_chrome()
+            _log_completion(bg.name)
+            logger.info("✓ Completed: {}", bg.name)
 
-            except Exception as exc:
-                logger.error("✗ Failed {}: {}", bg.name, exc)
-                # Save a debug screenshot
-                try:
-                    screenshot_path = (
-                        OUTPUT_DIR / f"error_{bg.stem}.png"
-                    )
-                    page.screenshot(path=str(screenshot_path))
-                    logger.info("Error screenshot saved: {}", screenshot_path)
-                except Exception:
-                    pass
-                errors.append(bg.name)
+        except Exception as exc:
+            logger.error("✗ Failed {}: {}", bg.name, exc)
+            _kill_chrome()
+            errors.append(bg.name)
 
-            # Cooldown between iterations (skip after last one)
-            if i < len(pending):
-                logger.info("Cooldown: {}s...", COOLDOWN_BETWEEN_ITERATIONS)
-                time.sleep(COOLDOWN_BETWEEN_ITERATIONS)
-
-        context.close()
+        # Cooldown between iterations (skip after last one)
+        if i < len(pending):
+            logger.info("Cooldown: {}s...", COOLDOWN_BETWEEN_ITERATIONS)
+            time.sleep(COOLDOWN_BETWEEN_ITERATIONS)
 
     # Summary
     logger.info("=== Pipeline Complete ===")

@@ -46,7 +46,7 @@ VIDEO_PROMPT = (
 # ---------------------------------------------------------------------------
 IMAGE_GENERATION_TIMEOUT = 120   # 2 minutes
 VIDEO_GENERATION_TIMEOUT = 300   # 5 minutes
-DOWNLOAD_TIMEOUT = 60            # 1 minute
+DOWNLOAD_TIMEOUT = 180            # 3 minutes
 POPUP_CHECK_TIMEOUT = 500        # milliseconds
 COOLDOWN_BETWEEN_ITERATIONS = 15  # seconds
 
@@ -76,9 +76,9 @@ UI_SELECTORS = {
 
     # --- Add images to prompt ---
     "add_ingredients_btn": 'button[aria-label="Add ingredients to the prompt box"]',
-    "upload_media_btn": 'button:has-text("Upload media")',
+    "upload_media_btn": 'button:has-text("Upload media"), button:has-text("Tải phương tiện lên")',
     "asset_list": '[role="listbox"][aria-label="Asset list"]',
-    "add_to_prompt_btn": 'button:has-text("Add to prompt")',
+    "add_to_prompt_btn": 'button:has-text("Add to prompt"), button:has-text("Thêm vào lời nhắc")',
     "close_ingredients_btn": 'button[aria-label="Add ingredients to the prompt box"][expanded]',
 
     # --- Asset panel tabs ---
@@ -94,12 +94,13 @@ UI_SELECTORS = {
     "settings_trigger": 'button[aria-label="Settings trigger"]',
 
     # --- Settings panel options (text-based selectors) ---
+    "model_dropdown_btn": 'button[aria-label="Select model family"]',
     "nano_banana_pro": 'text="Nano Banana Pro"',
     "nano_banana_2": 'text="Nano Banana 2", text="Imagen 3"',
     "omni_flash": 'text="Omni 1.1 Flash"',
     "ratio_16_9": 'text="16:9"',
     "resolution_720p": 'text="720p"',
-    "duration_8s": 'text="8 giây"',
+    "duration_8s": 'text="8 giây", text="8s"',
     "count_x1": 'text="x1"',
 
     # --- Settings panel tabs ---
@@ -107,7 +108,7 @@ UI_SELECTORS = {
     # We must target the exact text span inside the button.
     "settings_image_tab": '.toggle-text:text-is("Image"), .toggle-text:text-is("Hình ảnh")',
     "settings_video_tab": '.toggle-text:text-is("Video")',
-    "settings_frame_tab": '.toggle-text:text-is("Frame"), .toggle-text:text-is("Khung hình")',
+    "settings_frame_tab": '.toggle-text:text-is("Frames"), .toggle-text:text-is("Khung hình")',
     "settings_component_tab": '.toggle-text:text-is("Component"), .toggle-text:text-is("Thành phần")',
 
     # --- Generated results ---
@@ -119,9 +120,9 @@ UI_SELECTORS = {
     "download_720p_option": '[role="menuitem"]:has-text("720p")',
 
     # --- Popups / overlays ---
-    "dismiss_overlay": 'button[aria-label="Close"]',
+    "dismiss_overlay": 'button[aria-label="Close"], button[aria-label="Đóng"]',
     "dismiss_x_btn": 'button:has-text("✕")',
-    "error_modal": 'text="Không thành công"',
+    "error_modal": 'text="Không thành công", text="Failed", text="Error"',
     "error_dismiss_btn": 'button:has-text("OK")',
 
     # --- Navigation ---

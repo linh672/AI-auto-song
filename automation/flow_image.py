@@ -17,7 +17,7 @@ from automation.config import (
     IMAGE_PROMPT,
     UI_SELECTORS,
 )
-from automation.flow_utils import dismiss_popups, wait_for_generation
+from automation.flow_utils import dismiss_popups, submit_generation, wait_for_generation
 
 
 def _upload_if_needed(page: Page, image_path: Path) -> None:
@@ -112,14 +112,27 @@ def _open_settings_and_configure(page: Page) -> None:
     else:
         logger.warning("Could not find Image tab in settings panel! Check selector.")
 
-    # Select Nano Banana 2 model
-    model = popover.locator(UI_SELECTORS["nano_banana_2"])
-    if model.is_visible(timeout=2000):
-        model.click()
-        logger.info("Selected model: Nano Banana 2")
+    # Open model dropdown first
+    dropdown_btn = popover.locator(UI_SELECTORS["model_dropdown_btn"]).first
+    if dropdown_btn.is_visible(timeout=2000):
+        dropdown_btn.click()
         page.wait_for_timeout(500)
+        
+        # Select Nano Banana Pro from the menu
+        model_option = page.locator('.cdk-overlay-pane').last.locator('[role="menuitem"]:has-text("Nano Banana Pro")').first
+        if not model_option.is_visible():
+            model_option = page.locator('.cdk-overlay-pane').last.locator('text="Nano Banana Pro"').first
+            
+        if model_option.is_visible():
+            model_option.click()
+            logger.info("Selected model: Nano Banana Pro")
+        else:
+            logger.warning("Could not find Nano Banana Pro option in dropdown!")
+            page.keyboard.press("Escape")
     else:
-        logger.warning("Could not find Nano Banana 2 model! Check selector.")
+        logger.warning("Could not find model dropdown button! Check selector.")
+    
+    page.wait_for_timeout(500)
 
     # Select 16:9 ratio
     ratio = popover.locator(UI_SELECTORS["ratio_16_9"]).first
@@ -163,10 +176,21 @@ def create_composite_image(
     )
 
     page.goto(FLOW_URL)
-    page.locator(UI_SELECTORS["add_ingredients_btn"]).wait_for(
-        state="visible", timeout=30000
-    )
+    # Wait for the general prompt area to load, since add_ingredients_btn might not exist if in Video mode
+    page.locator(UI_SELECTORS["prompt_paragraph"]).first.wait_for(state="visible", timeout=30000)
     dismiss_popups(page)
+
+    # First, configure settings to ensure we are in Image mode!
+    _open_settings_and_configure(page)
+    
+    # Close settings
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(500)
+    
+    # Now the add ingredients button should be visible
+    page.locator(UI_SELECTORS["add_ingredients_btn"]).wait_for(
+        state="visible", timeout=10000
+    )
 
     # Upload images if needed (open panel once just for upload check)
     page.locator(UI_SELECTORS["add_ingredients_btn"]).click()
@@ -191,18 +215,15 @@ def create_composite_image(
     _add_single_asset(page, character_path.name)
     _add_single_asset(page, background_path.name)
 
-    # Type the prompt
+    # Enter prompt (we already configured settings above)
     prompt = page.locator(UI_SELECTORS["prompt_paragraph"]).first
     prompt.click()
     page.keyboard.type(IMAGE_PROMPT, delay=20)
     logger.info("Entered image prompt.")
 
-    # Configure settings
-    _open_settings_and_configure(page)
-
     # Submit
     dismiss_popups(page)
-    page.locator(UI_SELECTORS["start_generation_btn"]).click()
+    submit_generation(page)
     logger.info("Submitted image generation request.")
 
     # Wait for result

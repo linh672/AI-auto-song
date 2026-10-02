@@ -11,6 +11,28 @@ from playwright.sync_api import Page, TimeoutError as PlaywrightTimeout
 from automation.config import UI_SELECTORS, POPUP_CHECK_TIMEOUT
 
 
+class InsufficientCreditsError(RuntimeError):
+    """Raised when Google Flow credits are depleted."""
+
+
+def submit_generation(page: Page) -> None:
+    """Click the Start generation button, failing fast if credits are depleted.
+
+    Args:
+        page: The active Playwright page.
+
+    Raises:
+        InsufficientCreditsError: If the credits warning button is shown.
+        PlaywrightTimeout: If the button is not found for another reason.
+    """
+    warning_btn = page.locator('button.prompt-warning-button')
+    if warning_btn.is_visible(timeout=500):
+        raise InsufficientCreditsError(
+            "Google Flow credits are depleted. Top up at flow.google.com."
+        )
+    page.locator(UI_SELECTORS["start_generation_btn"]).click()
+
+
 def dismiss_popups(page: Page) -> None:
     """Dismiss unexpected overlays, cookie banners, and error modals.
 
