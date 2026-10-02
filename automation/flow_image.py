@@ -1,8 +1,9 @@
 """Automate the 'create composite image' step in Google Flow.
 
-Workflow: open the asset panel → add the character image, then the
-background image to the prompt → type the image prompt → configure
-Nano Banana Pro / 16:9 / x1 settings → submit → wait for result.
+Workflow: open the asset panel → add the character image to the prompt →
+reopen the asset panel → add the background image to the prompt →
+type the image prompt → configure Nano Banana Pro / 16:9 / x1 →
+submit → wait for result.
 """
 
 from pathlib import Path
@@ -45,22 +46,46 @@ def _upload_if_needed(page: Page, image_path: Path) -> None:
     logger.info("Upload complete: {}", filename)
 
 
-def _add_assets_to_prompt(page: Page, asset_names: list[str]) -> None:
-    """Select multiple assets from the ingredient panel and add them to the prompt.
+def _add_single_asset(page: Page, asset_name: str) -> None:
+    """Select one asset from the ingredient panel and add it to the prompt.
+
+    Google Flow's asset panel is single-select, so we must add assets
+    one at a time: open panel → select → add to prompt → panel closes.
 
     Args:
         page: The active Playwright page.
-        asset_names: List of display names (filenames) to add.
+        asset_name: Display name (filename) of the asset to add.
     """
-    for asset_name in asset_names:
-        asset_option = page.locator(f'[role="option"]:has-text("{asset_name}")').first
-        asset_option.click()
-        page.wait_for_timeout(500)
-
-    # Click "Add to prompt" once for all selected assets
-    page.locator(UI_SELECTORS["add_to_prompt_btn"]).click()
+    # Open the ingredients panel
+    page.locator(UI_SELECTORS["add_ingredients_btn"]).click()
     page.wait_for_timeout(1000)
-    logger.info("Added assets to prompt: {}", ", ".join(asset_names))
+
+    # Find the active ingredient panel overlay
+    ingredient_panel = page.locator('.cdk-overlay-pane').last
+    ingredient_panel.wait_for(state="visible", timeout=3000)
+
+    # Switch to Uploads tab
+    uploads_tab = ingredient_panel.locator(UI_SELECTORS["asset_tab_uploads"]).first
+    if uploads_tab.is_visible(timeout=2000):
+        uploads_tab.click()
+        page.wait_for_timeout(1000)
+    else:
+        logger.warning("Could not find Uploads tab in ingredient panel!")
+
+    # Select the asset
+    asset_option = ingredient_panel.locator(
+        f'[role="option"]:has-text("{asset_name}")'
+    ).first
+    asset_option.click()
+    page.wait_for_timeout(500)
+
+    # Click "Add to prompt" if still visible (panel may auto-close)
+    add_btn = ingredient_panel.locator(UI_SELECTORS["add_to_prompt_btn"])
+    if add_btn.is_visible(timeout=2000):
+        add_btn.click()
+        page.wait_for_timeout(1000)
+
+    logger.info("Added asset to prompt: {}", asset_name)
 
 
 def _open_settings_and_configure(page: Page) -> None:
@@ -75,27 +100,37 @@ def _open_settings_and_configure(page: Page) -> None:
     page.locator(UI_SELECTORS["settings_trigger"]).click()
     page.wait_for_timeout(1000)
 
+    # Find the active settings popover (Angular Material creates a cdk-overlay-pane at the end of the body)
+    popover = page.locator('.cdk-overlay-pane').last
+    popover.wait_for(state="visible", timeout=3000)
+
     # Select Image tab in settings
-    image_tab = page.locator(UI_SELECTORS["settings_image_tab"]).first
+    image_tab = popover.locator(UI_SELECTORS["settings_image_tab"]).first
     if image_tab.is_visible(timeout=2000):
         image_tab.click()
         page.wait_for_timeout(500)
+    else:
+        logger.warning("Could not find Image tab in settings panel! Check selector.")
 
-    # Select Nano Banana Pro model
-    model = page.locator(UI_SELECTORS["nano_banana_pro"])
+    # Select Nano Banana 2 model
+    model = popover.locator(UI_SELECTORS["nano_banana_2"])
     if model.is_visible(timeout=2000):
         model.click()
-        logger.info("Selected model: Nano Banana Pro")
+        logger.info("Selected model: Nano Banana 2")
         page.wait_for_timeout(500)
+    else:
+        logger.warning("Could not find Nano Banana 2 model! Check selector.")
 
     # Select 16:9 ratio
-    ratio = page.locator(UI_SELECTORS["ratio_16_9"]).first
+    ratio = popover.locator(UI_SELECTORS["ratio_16_9"]).first
     if ratio.is_visible(timeout=2000):
         ratio.click()
         logger.info("Selected ratio: 16:9")
+    else:
+        logger.warning("Could not find 16:9 ratio!")
 
     # Select x1 count
-    count = page.locator(UI_SELECTORS["count_x1"]).first
+    count = popover.locator(UI_SELECTORS["count_x1"]).first
     if count.is_visible(timeout=2000):
         count.click()
         logger.info("Selected count: x1")
@@ -108,7 +143,10 @@ def create_composite_image(
     character_path: Path,
     background_path: Path,
 ) -> None:
-    """Create a composite image by combining character + background in Google Flow.
+    """Create a composite image by combining character + background.
+
+    Assets are added one at a time because Google Flow's ingredient
+    panel is single-select (clicking a second asset deselects the first).
 
     Args:
         page: The active Playwright page.
@@ -125,25 +163,33 @@ def create_composite_image(
     )
 
     page.goto(FLOW_URL)
-    page.locator(UI_SELECTORS["add_ingredients_btn"]).wait_for(state="visible", timeout=30000)
+    page.locator(UI_SELECTORS["add_ingredients_btn"]).wait_for(
+        state="visible", timeout=30000
+    )
     dismiss_popups(page)
 
-    # Open the ingredients panel
+    # Upload images if needed (open panel once just for upload check)
     page.locator(UI_SELECTORS["add_ingredients_btn"]).click()
     page.wait_for_timeout(1000)
+    
+    ingredient_panel = page.locator('.cdk-overlay-pane').last
+    ingredient_panel.wait_for(state="visible", timeout=3000)
 
-    # Switch to Uploads tab so we can find/upload our images
-    uploads_tab = page.locator(UI_SELECTORS["asset_tab_uploads"]).first
+    uploads_tab = ingredient_panel.locator(UI_SELECTORS["asset_tab_uploads"]).first
     if uploads_tab.is_visible(timeout=2000):
         uploads_tab.click()
         page.wait_for_timeout(1000)
 
-    # Upload images if not already in Flow
     _upload_if_needed(page, character_path)
     _upload_if_needed(page, background_path)
 
-    # Add both character image and background image at once
-    _add_assets_to_prompt(page, [character_path.name, background_path.name])
+    # Close the panel before adding assets one by one
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(500)
+
+    # Add character image first, then background image
+    _add_single_asset(page, character_path.name)
+    _add_single_asset(page, background_path.name)
 
     # Type the prompt
     prompt = page.locator(UI_SELECTORS["prompt_paragraph"]).first

@@ -134,6 +134,7 @@ def run_pipeline() -> int:
             headless=False,
             args=CHROME_ARGS,
             accept_downloads=True,
+            downloads_path=str(OUTPUT_DIR.resolve()),
             viewport={"width": 1280, "height": 900},
         )
         page = context.pages[0] if context.pages else context.new_page()

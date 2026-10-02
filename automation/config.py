@@ -82,9 +82,9 @@ UI_SELECTORS = {
     "close_ingredients_btn": 'button[aria-label="Add ingredients to the prompt box"][expanded]',
 
     # --- Asset panel tabs ---
-    "asset_tab_all": '[role="tab"]:has-text("All")',
-    "asset_tab_images": '[role="tab"]:has-text("Images")',
-    "asset_tab_uploads": '[role="tab"]:has-text("Uploads")',
+    "asset_tab_all": '[role="tab"]:has(:text-is("All"))',
+    "asset_tab_images": '[role="tab"]:has(:text-is("Images")), [role="tab"]:has(:text-is("Hình ảnh"))',
+    "asset_tab_uploads": '[role="tab"]:has(:text-is("Uploads")), [role="tab"]:has(:text-is("Nội dung tải lên"))',
     "asset_search": 'textbox[aria-label="Search assets"]',
 
     # --- Generation ---
@@ -95,7 +95,7 @@ UI_SELECTORS = {
 
     # --- Settings panel options (text-based selectors) ---
     "nano_banana_pro": 'text="Nano Banana Pro"',
-    "nano_banana_2": 'text="Nano Banana 2"',
+    "nano_banana_2": 'text="Nano Banana 2", text="Imagen 3"',
     "omni_flash": 'text="Omni 1.1 Flash"',
     "ratio_16_9": 'text="16:9"',
     "resolution_720p": 'text="720p"',
@@ -103,10 +103,12 @@ UI_SELECTORS = {
     "count_x1": 'text="x1"',
 
     # --- Settings panel tabs ---
-    "settings_image_tab": 'text="Hình ảnh"',
-    "settings_video_tab": 'text="Video"',
-    "settings_frame_tab": 'text="Khung hình"',
-    "settings_component_tab": 'text="Thành phần"',
+    # Angular Material buttons contain <mat-icon>ligature_name</mat-icon> which pollutes the button's innerText.
+    # We must target the exact text span inside the button.
+    "settings_image_tab": '.toggle-text:text-is("Image"), .toggle-text:text-is("Hình ảnh")',
+    "settings_video_tab": '.toggle-text:text-is("Video")',
+    "settings_frame_tab": '.toggle-text:text-is("Frame"), .toggle-text:text-is("Khung hình")',
+    "settings_component_tab": '.toggle-text:text-is("Component"), .toggle-text:text-is("Thành phần")',
 
     # --- Generated results ---
     "generated_image": 'img[alt="Tile displaying a user\'s image"]',

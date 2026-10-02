@@ -28,17 +28,20 @@ def _configure_video_settings(page: Page) -> None:
     page.locator(UI_SELECTORS["settings_trigger"]).click()
     page.wait_for_timeout(1000)
 
+    # Find the active settings popover
+    popover = page.locator('.cdk-overlay-pane').last
+    popover.wait_for(state="visible", timeout=3000)
+
     # Select Video tab in settings
-    video_tab = page.locator(UI_SELECTORS["settings_video_tab"]).first
+    video_tab = popover.locator(UI_SELECTORS["settings_video_tab"]).first
     if video_tab.is_visible(timeout=2000):
         video_tab.click()
         page.wait_for_timeout(500)
+    else:
+        logger.warning("Could not find Video tab in settings panel! Check selector.")
 
     # Try to select the model
-    # The button text shows the current model. If we click it, it opens the dropdown.
-    # We should only click the dropdown option if we need to change it, but it's tricky to 
-    # know without clicking the button first. Let's press Escape to ensure any open dropdowns are closed.
-    model_btn = page.locator(UI_SELECTORS["omni_flash"]).first
+    model_btn = popover.locator(UI_SELECTORS["omni_flash"]).first
     if model_btn.is_visible(timeout=2000):
         model_btn.click()
         page.wait_for_timeout(500)
@@ -49,14 +52,16 @@ def _configure_video_settings(page: Page) -> None:
         page.keyboard.press("Escape")  # Close dropdown if it's still open
         logger.info("Selected model: Omni 1.1 Flash")
         page.wait_for_timeout(500)
+    else:
+        logger.warning("Could not find Omni 1.1 Flash model! Check selector.")
 
-    # Iterate through other settings (video has no aspect ratio)
+    # Iterate through other settings
     for sel_key, log_msg in [
         ("resolution_720p", "720p"),
         ("duration_8s", "8 giây"),
         ("count_x1", "x1"),
     ]:
-        elem = page.locator(UI_SELECTORS[sel_key]).first
+        elem = popover.locator(UI_SELECTORS[sel_key]).first
         if elem.is_visible(timeout=1000):
             elem.click()
             logger.info("Selected {}: {}", sel_key, log_msg)
@@ -83,19 +88,25 @@ def create_video_from_image(page: Page) -> None:
     page.locator(UI_SELECTORS["add_ingredients_btn"]).click()
     page.wait_for_timeout(1000)
 
+    # Find the active ingredient panel overlay
+    ingredient_panel = page.locator('.cdk-overlay-pane').last
+    ingredient_panel.wait_for(state="visible", timeout=3000)
+
     # Switch to Images tab to ensure we pick an image, not a video
-    images_tab = page.locator(UI_SELECTORS["asset_tab_images"]).first
+    images_tab = ingredient_panel.locator(UI_SELECTORS["asset_tab_images"]).first
     if images_tab.is_visible(timeout=2000):
         images_tab.click()
         page.wait_for_timeout(1000)
+    else:
+        logger.warning("Could not find Images tab in ingredient panel!")
 
     # Pick the most recent image (first in the list)
-    first_image = page.locator(UI_SELECTORS["asset_list"]).locator('[role="option"]').first
+    first_image = ingredient_panel.locator(UI_SELECTORS["asset_list"]).locator('[role="option"]').first
     first_image.click()
     page.wait_for_timeout(500)
 
     # Add to prompt (sometimes the panel auto-closes, so make it optional)
-    add_btn = page.locator(UI_SELECTORS["add_to_prompt_btn"])
+    add_btn = ingredient_panel.locator(UI_SELECTORS["add_to_prompt_btn"])
     if add_btn.is_visible(timeout=2000):
         add_btn.click()
         page.wait_for_timeout(1000)

@@ -4,6 +4,7 @@ Provides popup/cookie dismissal and generation-wait helpers used by
 all flow_*.py modules.
 """
 
+import time
 from loguru import logger
 from playwright.sync_api import Page, TimeoutError as PlaywrightTimeout
 
@@ -42,8 +43,7 @@ def dismiss_popups(page: Page) -> None:
 def wait_for_generation(page: Page, timeout_ms: int) -> None:
     """Wait for new content to appear after submitting a generation.
 
-    Waits for either a new generated image or video thumbnail to appear
-    in the project gallery.
+    Waits for the progress percentage (e.g. 7%, 28%) to appear and then disappear.
 
     Args:
         page: The active Playwright page.
@@ -53,10 +53,38 @@ def wait_for_generation(page: Page, timeout_ms: int) -> None:
         PlaywrightTimeout: If no result appears within timeout.
     """
     logger.info("Waiting for generation result (timeout {}s)...", timeout_ms // 1000)
-    try:
-        page.wait_for_load_state("networkidle", timeout=timeout_ms)
-    except PlaywrightTimeout:
-        logger.warning("networkidle timed out, but continuing anyway.")
     
-    page.wait_for_timeout(5000)  # extra buffer for rendering
-    logger.info("Generation wait finished.")
+    # Wait for the generation to kick off (progress bar or % text to appear)
+    # We look for text matching a percentage like "1%" up to "99%"
+    start_time = time.time()
+    logger.info("Waiting for progress indicator to appear...")
+    page.wait_for_timeout(5000) # Give it 5 seconds to start
+    
+    # We will poll for the absence of any elements containing "%" inside the gallery.
+    # The safest way is to wait for the first tile to NOT have a percentage sign if it's the active one,
+    # or wait until there are NO tiles with a percentage.
+    # Since we might have multiple generating, this could be tricky, but usually the first one is ours.
+    # Let's just wait for 5 seconds to let the UI update, then poll until no tile has "%"
+    
+    while time.time() - start_time < timeout_ms / 1000:
+        # Check if there's any visible text that looks like a progress percentage (e.g., "7%", "99%")
+        progress_visible = page.evaluate('''() => {
+            const tiles = document.querySelectorAll('div');
+            for (let tile of tiles) {
+                if (tile.textContent && tile.textContent.trim().match(/^\\d{1,3}%$/)) {
+                    return true;
+                }
+            }
+            return false;
+        }''')
+        
+        if not progress_visible:
+            # Check if we have an image/video thumbnail as the first item
+            logger.info("No active progress indicators found. Generation complete.")
+            page.wait_for_timeout(2000)
+            return
+            
+        page.wait_for_timeout(3000)
+        logger.info("Still generating...")
+        
+    logger.warning("Generation wait timed out! Proceeding anyway.")

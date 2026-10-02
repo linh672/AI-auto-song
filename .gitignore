@@ -19,6 +19,7 @@ __pycache__/
 *$py.class
 
 archive02/
+.playwright-mcp
 
 # C extensions
 *.so
