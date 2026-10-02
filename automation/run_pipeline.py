@@ -30,7 +30,7 @@ from automation.flow_video import create_video_from_image
 # ---------------------------------------------------------------------------
 # Browser configuration (Windows-specific)
 # ---------------------------------------------------------------------------
-USER_DATA_DIR = r"C:\FlowBotProfile"
+USER_DATA_DIR = r"C:\FlowBotProfile_Account2"
 CHROME_ARGS = [
     "--disable-blink-features=AutomationControlled",
     "--disable-infobars",
@@ -163,6 +163,7 @@ def run_pipeline() -> int:
                 page = ctx.pages[0] if ctx.pages else ctx.new_page()
                 create_composite_image(page, character, bg)
                 create_video_from_image(page)
+                project_url = page.url
                 _safe_close(ctx)
 
             _kill_chrome()
@@ -178,7 +179,7 @@ def run_pipeline() -> int:
                     viewport={"width": 1280, "height": 900},
                 )
                 page = ctx.pages[0] if ctx.pages else ctx.new_page()
-                page.goto(FLOW_URL)
+                page.goto(project_url)
                 page.wait_for_timeout(5000)
                 download_video(page, output_path)
                 _safe_close(ctx)

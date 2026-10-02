@@ -80,7 +80,7 @@ def create_video_from_image(page: Page) -> None:
     logger.info("Creating video from generated image...")
 
     # Start fresh to clear previous prompts
-    page.goto(FLOW_URL)
+    page.reload()
     page.locator(UI_SELECTORS["add_ingredients_btn"]).wait_for(state="visible", timeout=30000)
     dismiss_popups(page)
 

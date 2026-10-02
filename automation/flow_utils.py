@@ -76,22 +76,36 @@ def wait_for_generation(page: Page, timeout_ms: int) -> None:
     """
     logger.info("Waiting for generation result (timeout {}s)...", timeout_ms // 1000)
     
-    # Wait for the generation to kick off (progress bar or % text to appear)
-    # We look for text matching a percentage like "1%" up to "99%"
-    start_time = time.time()
-    logger.info("Waiting for progress indicator to appear...")
-    page.wait_for_timeout(5000) # Give it 5 seconds to start
-    
     # We will poll for the absence of any elements containing "%" inside the gallery.
-    # The safest way is to wait for the first tile to NOT have a percentage sign if it's the active one,
-    # or wait until there are NO tiles with a percentage.
-    # Since we might have multiple generating, this could be tricky, but usually the first one is ours.
-    # Let's just wait for 5 seconds to let the UI update, then poll until no tile has "%"
+    start_time = time.time()
     
-    while time.time() - start_time < timeout_ms / 1000:
-        # Check if there's any visible text that looks like a progress percentage (e.g., "7%", "99%")
+    # First, wait for the progress indicator to APPEAR (up to 30 seconds)
+    logger.info("Waiting for progress indicator to appear...")
+    appeared = False
+    while time.time() - start_time < 30:
         progress_visible = page.evaluate('''() => {
-            const tiles = document.querySelectorAll('div');
+            const tiles = document.querySelectorAll('*');
+            for (let tile of tiles) {
+                if (tile.textContent && tile.textContent.trim().match(/^\\d{1,3}%$/)) {
+                    return true;
+                }
+            }
+            return false;
+        }''')
+        if progress_visible:
+            appeared = True
+            logger.info("Progress indicator found.")
+            break
+        page.wait_for_timeout(1000)
+        
+    if not appeared:
+        logger.warning("No progress indicator appeared within 30s. Assuming it either finished instantly or failed.")
+        
+    # Now, wait for it to DISAPPEAR
+    logger.info("Waiting for generation to finish...")
+    while time.time() - start_time < timeout_ms / 1000:
+        progress_visible = page.evaluate('''() => {
+            const tiles = document.querySelectorAll('*');
             for (let tile of tiles) {
                 if (tile.textContent && tile.textContent.trim().match(/^\\d{1,3}%$/)) {
                     return true;
@@ -101,7 +115,6 @@ def wait_for_generation(page: Page, timeout_ms: int) -> None:
         }''')
         
         if not progress_visible:
-            # Check if we have an image/video thumbnail as the first item
             logger.info("No active progress indicators found. Generation complete.")
             page.wait_for_timeout(2000)
             return

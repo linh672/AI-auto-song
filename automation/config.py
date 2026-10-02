@@ -23,7 +23,7 @@ PROGRESS_LOG: Path = _AUTOMATION_DIR / "progress.log"
 # ---------------------------------------------------------------------------
 # Google Flow URL
 # ---------------------------------------------------------------------------
-FLOW_URL = "https://flow.google.com/u/4/project/2a0986c0-3556-41b6-956e-d45046786417"
+FLOW_URL = "https://flow.google.com"
 
 # ---------------------------------------------------------------------------
 # Prompts
@@ -69,6 +69,9 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
 UI_SELECTORS = {
     # --- Cookie consent (fresh sessions) ---
     "cookie_ok": 'button:has-text("OK, got it")',
+
+    # --- Homepage ---
+    "new_project_btn": 'text="New project"',
 
     # --- Prompt area (bottom bar) ---
     "prompt_paragraph": '[contenteditable="true"]',

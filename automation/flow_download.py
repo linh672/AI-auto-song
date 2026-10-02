@@ -19,7 +19,7 @@ from automation.flow_utils import dismiss_popups
 
 
 def _find_and_wait_for_crdownload(timeout: int = 60) -> Path | None:
-    """Find a recent .crdownload file in OUTPUT_DIR and wait for it to finish.
+    """Find a recent downloaded file in OUTPUT_DIR and wait for it to finish.
 
     Args:
         timeout: Max seconds to wait for the file to appear and finish downloading.
@@ -34,7 +34,7 @@ def _find_and_wait_for_crdownload(timeout: int = 60) -> Path | None:
     crdownload_file = None
     while time.time() - start_time < timeout:
         recent_files = sorted(
-            OUTPUT_DIR.glob("*.crdownload"),
+            [p for p in OUTPUT_DIR.iterdir() if p.is_file() and not p.name.endswith('.mp4') and not p.name.startswith('.')],
             key=lambda p: p.stat().st_mtime,
             reverse=True,
         )
@@ -110,6 +110,15 @@ def download_video(page: Page, output_path: Path) -> Path:
     download_btn = page.locator(UI_SELECTORS["download_btn"])
     try:
         download_btn.wait_for(state="visible", timeout=5000)
+        
+        # Clean up any old extensionless files in the directory so we don't accidentally pick them up
+        for p in OUTPUT_DIR.iterdir():
+            if p.is_file() and not p.name.endswith('.mp4') and not p.name.startswith('.'):
+                try:
+                    p.unlink()
+                except Exception as e:
+                    logger.debug(f"Failed to delete old temp file {p.name}: {e}")
+                    
         download_btn.click()
         page.wait_for_timeout(1000)
     except Exception as e:

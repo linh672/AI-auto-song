@@ -176,6 +176,16 @@ def create_composite_image(
     )
 
     page.goto(FLOW_URL)
+    
+    # Click New Project if we are on the homepage
+    try:
+        new_project = page.locator(UI_SELECTORS["new_project_btn"]).first
+        new_project.wait_for(state="visible", timeout=10000)
+        new_project.click(force=True)
+        logger.info("Clicked 'New project'")
+    except Exception as e:
+        logger.warning(f"Failed to click 'New project': {e}")
+
     # Wait for the general prompt area to load, since add_ingredients_btn might not exist if in Video mode
     page.locator(UI_SELECTORS["prompt_paragraph"]).first.wait_for(state="visible", timeout=30000)
     dismiss_popups(page)
