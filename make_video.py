@@ -4,7 +4,9 @@
 Workflow
 --------
 1. Scan ``gradio_outputs/`` recursively for every ``*.mp3`` file.
-2. Probe all MP3 durations and input video resolution in parallel.
+   Probe all MP3 durations in parallel and write ``timeline.txt``
+   (cumulative timestamps per batch folder) into the output/batch directory.
+2. Probe input video resolution in parallel (combined with MP3 probing above).
 3. Strip container-level AI metadata (C2PA, XMP, EXIF, mov provenance atoms).
 4. Remove supported visible marks and regenerate frames to mitigate SynthID.
 5. Upscale the input video in ``input/`` to 1080p if below 1080p (closed-GOP, no B-frames).
@@ -297,6 +299,65 @@ def _format_seconds(seconds: float) -> str:
     if hours > 0:
         return f"{hours}h {mins:02d}m {secs:02d}s"
     return f"{mins}m {secs:02d}s"
+
+
+def _format_timestamp(seconds: float) -> str:
+    """Format a cumulative duration in seconds as a timeline timestamp.
+
+    Args:
+        seconds: Total elapsed seconds.
+
+    Returns:
+        Compact timestamp string like ``'0:00'``, ``'2:49'``, or ``'1:02:07'``.
+    """
+    total_secs = int(seconds)
+    hours, remainder = divmod(total_secs, 3600)
+    mins, secs = divmod(remainder, 60)
+    if hours > 0:
+        return f"{hours}:{mins:02d}:{secs:02d}"
+    return f"{mins}:{secs:02d}"
+
+
+def _build_timeline_txt(
+    mp3_files: list[Path],
+    durations: dict[Path, float],
+    out_path: Path,
+) -> Path:
+    """Write a human-readable timeline of batch folders to *out_path*.
+
+    Each line maps the start–end timestamp range to the batch folder name
+    that contributed the audio for that segment, e.g.::
+
+        0:00-2:49: batch_1790284892_lofi
+        2:49-5:38: batch_1790284893_lofi
+
+    When multiple consecutive MP3s share the same parent folder they are
+    collapsed into a single line.
+
+    Args:
+        mp3_files: Ordered list of MP3 paths (same order as concatenation).
+        durations: Mapping of path -> duration in seconds from ffprobe.
+        out_path: Destination file path for ``timeline.txt``.
+
+    Returns:
+        The resolved *out_path* after writing.
+    """
+    lines: list[str] = []
+    cursor = 0.0
+    i = 0
+    while i < len(mp3_files):
+        folder_name = mp3_files[i].parent.name
+        segment_start = cursor
+        # Accumulate consecutive files from the same folder
+        while i < len(mp3_files) and mp3_files[i].parent.name == folder_name:
+            cursor += durations.get(mp3_files[i], 0.0)
+            i += 1
+        start_str = _format_timestamp(segment_start)
+        end_str = _format_timestamp(cursor)
+        lines.append(f"{start_str}-{end_str}: {folder_name}")
+
+    out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return out_path
 
 
 def _probe_audio_properties(path: Path) -> tuple[str, str, str]:
@@ -1135,6 +1196,11 @@ def main(
         d = durations[f]
         print(f"      {i:>2}. {f.parent.name}/{f.name}  [{_format_seconds(d)}]")
     print(f"      (probed in {probe_secs:.2f}s)")
+
+    # Write timeline.txt into the output directory (= batch_dir in batch mode)
+    timeline_path = effective_output_dir / "timeline.txt"
+    _build_timeline_txt(mp3_files, durations, timeline_path)
+    print(f"      Timeline     : {timeline_path}")
 
     video_duration = durations[input_video]
     total_mp3_duration = sum(durations[f] for f in mp3_files)
