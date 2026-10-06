@@ -159,6 +159,7 @@ def run_pipeline() -> int:
                     user_data_dir=USER_DATA_DIR, channel="chrome",
                     headless=False, args=CHROME_ARGS,
                     viewport={"width": 1280, "height": 900},
+                    accept_downloads=True, downloads_path=str(OUTPUT_DIR)
                 )
                 page = ctx.pages[0] if ctx.pages else ctx.new_page()
                 create_composite_image(page, character, bg)

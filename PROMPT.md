@@ -16,6 +16,7 @@ Lo-fi hip hop and chillhop with laid-back swung drums, mellow piano loops, soft 
 
 conda activate video_creation
 python -m acestep.acestep_v15_pipeline (best)
+& "C:\Program Files\Google\Chrome\Application\chrome.exe" --user-data-dir="C:\FlowBotProfile_Account3" "https://flow.google.com/"
 python create_input.py (best)
 python make_video.py (best) 
 
@@ -90,3 +91,5 @@ Cozy ambient sounds
 add the first dog in the first picture into the second picture (the new picture ratio 16:9) and change the pose so the dog is more chill dont add any text
 
 A seamless, subtle looping animation. The cute black puppy rests quietly on the ground in the meadow, showing only gentle, natural chest breathing and an occasional slow, sleepy blink, keeping its mouth completely still.
+
+check all the timeline in archive folder give me a title for that video (take the screenshot of input video to understand the visual and that video's title will go with smth like chill dog with Lofi Music)  put it in the first line of each timeline.txt file  and change all the titles for each song in each timeline (make the name unique and related to chill music)

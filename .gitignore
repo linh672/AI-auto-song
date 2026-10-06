@@ -269,3 +269,6 @@ package-lock.json
 
 # Local Real-ESRGAN executable and model weights for make_video.py
 tools/
+
+
+automation/background

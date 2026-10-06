@@ -67,23 +67,40 @@ def _add_single_asset(page: Page, asset_name: str) -> None:
     # Switch to Uploads tab
     uploads_tab = ingredient_panel.locator(UI_SELECTORS["asset_tab_uploads"]).first
     if uploads_tab.is_visible(timeout=2000):
-        uploads_tab.click()
-        page.wait_for_timeout(1000)
+        try:
+            uploads_tab.click(force=True)
+            page.wait_for_timeout(1000)
+        except Exception as e:
+            logger.warning(f"Failed to click Uploads tab: {e}")
     else:
         logger.warning("Could not find Uploads tab in ingredient panel!")
 
-    # Select the asset
+    # Select the asset (force click to avoid Angular Material tooltip interceptions)
     asset_option = ingredient_panel.locator(
         f'[role="option"]:has-text("{asset_name}")'
     ).first
-    asset_option.click()
-    page.wait_for_timeout(500)
+    try:
+        asset_option.scroll_into_view_if_needed()
+        asset_option.click(force=True)
+        page.wait_for_timeout(1000)
+    except Exception as e:
+        logger.warning(f"Failed to click asset {asset_name}: {e}")
 
     # Click "Add to prompt" if still visible (panel may auto-close)
     add_btn = ingredient_panel.locator(UI_SELECTORS["add_to_prompt_btn"])
     if add_btn.is_visible(timeout=2000):
-        add_btn.click()
-        page.wait_for_timeout(1000)
+        try:
+            add_btn.click(force=True)
+            page.wait_for_timeout(1000)
+        except Exception as e:
+            logger.warning(f"Failed to click Add to Prompt: {e}")
+
+    # Ensure panel is closed for the next asset
+    try:
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(500)
+    except:
+        pass
 
     logger.info("Added asset to prompt: {}", asset_name)
 
@@ -96,8 +113,11 @@ def _open_settings_and_configure(page: Page) -> None:
     """
     dismiss_popups(page)
 
-    # Click settings trigger to open the settings panel
-    page.locator(UI_SELECTORS["settings_trigger"]).click()
+    # Click settings trigger to open the settings panel (force click to bypass modals)
+    try:
+        page.locator(UI_SELECTORS["settings_trigger"]).click(force=True)
+    except Exception as e:
+        logger.warning(f"Failed to click settings trigger: {e}")
     page.wait_for_timeout(1000)
 
     # Find the active settings popover (Angular Material creates a cdk-overlay-pane at the end of the body)
