@@ -30,7 +30,11 @@ from automation.flow_video import create_video_from_image
 # ---------------------------------------------------------------------------
 # Browser configuration (Windows-specific)
 # ---------------------------------------------------------------------------
-USER_DATA_DIR = r"C:\FlowBotProfile_Account3"
+PROFILES = [
+    r"C:\FlowBotProfile",
+    r"C:\FlowBotProfile_Account2",
+    r"C:\FlowBotProfile_Account3",
+]
 CHROME_ARGS = [
     "--disable-blink-features=AutomationControlled",
     "--disable-infobars",
@@ -149,49 +153,58 @@ def run_pipeline() -> int:
             "=== [{}/{}] Processing: {} ===",
             i, len(pending), bg.name,
         )
-        try:
-            output_path = OUTPUT_DIR / (bg.stem + ".mp4")
-            _kill_chrome()
+        success = False
+        output_path = OUTPUT_DIR / (bg.stem + ".mp4")
 
-            # Phase 1: Generate image + video
-            with sync_playwright() as pw:
-                ctx = pw.chromium.launch_persistent_context(
-                    user_data_dir=USER_DATA_DIR, channel="chrome",
-                    headless=False, args=CHROME_ARGS,
-                    viewport={"width": 1280, "height": 900},
-                    accept_downloads=True, downloads_path=str(OUTPUT_DIR)
-                )
-                page = ctx.pages[0] if ctx.pages else ctx.new_page()
-                create_composite_image(page, character, bg)
-                create_video_from_image(page)
-                project_url = page.url
-                _safe_close(ctx)
+        for profile in PROFILES:
+            logger.info("Attempting with profile: {}", profile)
+            try:
+                _kill_chrome()
 
-            _kill_chrome()
-            time.sleep(2)
+                # Phase 1: Generate image + video
+                with sync_playwright() as pw:
+                    ctx = pw.chromium.launch_persistent_context(
+                        user_data_dir=profile, channel="chrome",
+                        headless=False, args=CHROME_ARGS,
+                        viewport={"width": 1280, "height": 900},
+                        accept_downloads=True, downloads_path=str(OUTPUT_DIR)
+                    )
+                    page = ctx.pages[0] if ctx.pages else ctx.new_page()
+                    create_composite_image(page, character, bg)
+                    create_video_from_image(page)
+                    project_url = page.url
+                    _safe_close(ctx)
 
-            # Phase 2: Download with a fresh browser context
-            with sync_playwright() as pw:
-                ctx = pw.chromium.launch_persistent_context(
-                    user_data_dir=USER_DATA_DIR, channel="chrome",
-                    headless=False, args=CHROME_ARGS,
-                    accept_downloads=True,
-                    downloads_path=str(OUTPUT_DIR.resolve()),
-                    viewport={"width": 1280, "height": 900},
-                )
-                page = ctx.pages[0] if ctx.pages else ctx.new_page()
-                page.goto(project_url)
-                page.wait_for_timeout(5000)
-                download_video(page, output_path)
-                _safe_close(ctx)
+                _kill_chrome()
+                time.sleep(2)
 
-            _kill_chrome()
-            _log_completion(bg.name)
-            logger.info("✓ Completed: {}", bg.name)
+                # Phase 2: Download with a fresh browser context
+                with sync_playwright() as pw:
+                    ctx = pw.chromium.launch_persistent_context(
+                        user_data_dir=profile, channel="chrome",
+                        headless=False, args=CHROME_ARGS,
+                        accept_downloads=True,
+                        downloads_path=str(OUTPUT_DIR.resolve()),
+                        viewport={"width": 1280, "height": 900},
+                    )
+                    page = ctx.pages[0] if ctx.pages else ctx.new_page()
+                    page.goto(project_url)
+                    page.wait_for_timeout(5000)
+                    download_video(page, output_path)
+                    _safe_close(ctx)
 
-        except Exception as exc:
-            logger.error("✗ Failed {}: {}", bg.name, exc)
-            _kill_chrome()
+                _kill_chrome()
+                _log_completion(bg.name)
+                logger.info("✓ Completed: {} with profile {}", bg.name, profile)
+                success = True
+                break  # Move to next background
+
+            except Exception as exc:
+                logger.warning("✗ Failed {} with profile {}: {}", bg.name, profile, exc)
+                _kill_chrome()
+
+        if not success:
+            logger.error("✗ Exhausted all profiles for {}", bg.name)
             errors.append(bg.name)
 
         # Cooldown between iterations (skip after last one)
