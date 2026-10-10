@@ -93,3 +93,4 @@ add the first dog in the first picture into the second picture (the new picture 
 A seamless, subtle looping animation. The cute black puppy rests quietly on the ground in the meadow, showing only gentle, natural chest breathing and an occasional slow, sleepy blink, keeping its mouth completely still.
 
 check all the timeline in archive folder give me a title for that video (take the screenshot of input video to understand the visual and that video's title will go with smth like chill dog with Lofi Music)  put it in the first line of each timeline.txt file  and change all the titles for each song in each timeline (make the name unique and related to chill music)
+also change the 1...final.mp4 name file to the name of that video
