@@ -65,6 +65,12 @@ from pathlib import Path
 from tqdm import tqdm
 
 from watermark_clean import strip_container_metadata
+from video_metadata_generator import (
+    VideoMetadata,
+    extract_video_frame,
+    generate_video_metadata,
+    sanitize_filename,
+)
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -322,42 +328,61 @@ def _build_timeline_txt(
     mp3_files: list[Path],
     durations: dict[Path, float],
     out_path: Path,
+    metadata: VideoMetadata | None = None,
+    total_duration: float | None = None,
 ) -> Path:
-    """Write a human-readable timeline of batch folders to *out_path*.
+    """Write a human-readable timeline to *out_path*.
 
-    Each line maps the start–end timestamp range to the batch folder name
-    that contributed the audio for that segment, e.g.::
-
-        0:00-2:49: batch_1790284892_lofi
-        2:49-5:38: batch_1790284893_lofi
-
-    When multiple consecutive MP3s share the same parent folder they are
-    collapsed into a single line.
+    If *metadata* is provided, the first three lines contain the video title,
+    the warm greeting, and the inspirational quote. Segment titles use the unique
+    song names from *metadata.song_titles*. Otherwise, falls back to batch folder names.
+    If *total_duration* is provided, scales track segments proportionally and guarantees
+    the final timestamp matches *total_duration* to the exact second.
 
     Args:
         mp3_files: Ordered list of MP3 paths (same order as concatenation).
         durations: Mapping of path -> duration in seconds from ffprobe.
         out_path: Destination file path for ``timeline.txt``.
+        metadata: Optional VideoMetadata with title, greeting, quote, and song titles.
+        total_duration: Optional actual duration of the concatenated audio file.
 
     Returns:
         The resolved *out_path* after writing.
     """
     lines: list[str] = []
+    if metadata:
+        lines.extend([metadata.title, metadata.greeting, metadata.quote])
+
+    sum_probed = sum(durations.get(f, 0.0) for f in mp3_files)
+    scale = (total_duration / sum_probed) if (total_duration and sum_probed > 0) else 1.0
+
     cursor = 0.0
     i = 0
+    seg_idx = 0
     while i < len(mp3_files):
         folder_name = mp3_files[i].parent.name
         segment_start = cursor
+        seg_duration = 0.0
         # Accumulate consecutive files from the same folder
         while i < len(mp3_files) and mp3_files[i].parent.name == folder_name:
-            cursor += durations.get(mp3_files[i], 0.0)
+            seg_duration += durations.get(mp3_files[i], 0.0)
             i += 1
+        cursor += seg_duration * scale
+        if i >= len(mp3_files) and total_duration:
+            cursor = total_duration
         start_str = _format_timestamp(segment_start)
         end_str = _format_timestamp(cursor)
-        lines.append(f"{start_str}-{end_str}: {folder_name}")
+        track_name = (
+            metadata.song_titles[seg_idx]
+            if (metadata and seg_idx < len(metadata.song_titles))
+            else folder_name
+        )
+        lines.append(f"{start_str}-{end_str}: {track_name}")
+        seg_idx += 1
 
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return out_path
+
 
 
 def _probe_audio_properties(path: Path) -> tuple[str, str, str]:
@@ -853,6 +878,7 @@ def _build_video_cmd(
         "-map", "1:a:0",
         "-c:v", "copy",
         "-c:a", "copy",
+        "-video_track_timescale", "90000",
         "-t", str(total_seconds),
         "-shortest",
         "-movflags", "+faststart",
@@ -1130,6 +1156,11 @@ def _parse_args() -> argparse.Namespace:
         default=100,
         help="Number of audio files per video in batch mode (default: 100).",
     )
+    parser.add_argument(
+        "--no-intro-overlay",
+        action="store_true",
+        help="Skip baking in typewriter intro quote overlay.",
+    )
     return parser.parse_args()
 
 
@@ -1137,6 +1168,7 @@ def main(
     *,
     step_3_enabled: bool = True,
     archive_enabled: bool = True,
+    intro_overlay_enabled: bool = True,
     input_video: Path | None = None,
     mp3_files: list[Path] | None = None,
     output_dir: Path | None = None,
@@ -1146,6 +1178,7 @@ def main(
     Args:
         step_3_enabled: Whether to run visible-mark and SynthID cleanup in step 3.
         archive_enabled: Whether to move used inputs to archive after rendering.
+        intro_overlay_enabled: Whether to bake typewriter intro quote overlay into video.
         input_video: Specific input video path. Auto-discovered from input/ if None.
         mp3_files: Specific list of audio files. Auto-collected from gradio_outputs/ if None.
         output_dir: Output directory for the final MP4. Defaults to output/ if None.
@@ -1197,12 +1230,21 @@ def main(
         print(f"      {i:>2}. {f.parent.name}/{f.name}  [{_format_seconds(d)}]")
     print(f"      (probed in {probe_secs:.2f}s)")
 
+    video_duration = durations[input_video]
+
+    # Extract preview frame at 5s and generate AI/fallback metadata
+    preview_path = effective_output_dir / "preview.jpg"
+    if not preview_path.exists():
+        extract_video_frame(input_video, preview_path, duration=video_duration)
+    metadata = generate_video_metadata(
+        preview_path, song_count=len(mp3_files), video_duration=video_duration
+    )
+
     # Write timeline.txt into the output directory (= batch_dir in batch mode)
     timeline_path = effective_output_dir / "timeline.txt"
-    _build_timeline_txt(mp3_files, durations, timeline_path)
+    _build_timeline_txt(mp3_files, durations, timeline_path, metadata=metadata)
     print(f"      Timeline     : {timeline_path}")
 
-    video_duration = durations[input_video]
     total_mp3_duration = sum(durations[f] for f in mp3_files)
     loops_needed = max(0, int(total_mp3_duration / video_duration))
     plays = loops_needed + 1
@@ -1260,14 +1302,19 @@ def main(
             mp3_files, tmp_path, expected_duration=total_mp3_duration
         )
         print(f"      Done in {time.perf_counter() - t1:.1f}s")
+        _build_timeline_txt(
+            mp3_files, durations, timeline_path, metadata=metadata, total_duration=total_duration
+        )
 
         # 6. Loop video + merge audio in ONE fast stream-copy pass
-        final_output = effective_output_dir / f"{timestamp}_final.mp4"
+        safe_title = sanitize_filename(metadata.title) if metadata else f"{timestamp}_final"
+        final_output = effective_output_dir / f"{safe_title}.mp4"
+        baseline_output = tmp_path / "baseline_full.mp4"
         print(f"\n[6/6] Loop video ({_format_seconds(video_duration)} x~{plays}) + merge audio (stream copy - zero re-encode)")
         print(f"      Source video : {ready_video.name}")
         print("      Video stream : copy (lossless, instant via MPEG-TS)")
         print(f"      Audio stream : copy ({audio_codec_desc})")
-        print(f"      Output       : {final_output.name}")
+        print(f"      Target video : {final_output.name}")
 
         t2 = time.perf_counter()
         loop_ts = tmp_path / "loop_source.ts"
@@ -1275,7 +1322,7 @@ def main(
         cmd = _build_video_cmd(
             video_ts=loop_ts,
             audio=concat_audio_path,
-            out_path=final_output,
+            out_path=baseline_output,
             total_seconds=total_duration,
         )
 
@@ -1284,6 +1331,33 @@ def main(
             total_seconds=total_duration,
             desc="      Video stream copy & mux",
         )
+
+        if intro_overlay_enabled and metadata:
+            print("      Applying typewriter intro text overlay...")
+            try:
+                from intro_quote_renderer import TypewriterConfig, build_lines_layout
+                from add_intro_quote_overlay import splice_video_with_intro
+
+                tw_config = TypewriterConfig(total_duration=20.0, anim_duration=2.5)
+                layout = build_lines_layout(
+                    text1="Hi my friend...",
+                    greeting=metadata.greeting,
+                    quote=metadata.quote,
+                    config=tw_config,
+                )
+                splice_video_with_intro(
+                    video_path=baseline_output,
+                    out_path=final_output,
+                    layout=layout,
+                    config=tw_config,
+                    split_seconds=24.0,
+                )
+            except Exception as exc:
+                print(f"      [WARN] Intro overlay failed ({exc}). Using baseline video.")
+                if baseline_output.exists():
+                    shutil.move(str(baseline_output), str(final_output))
+        else:
+            shutil.move(str(baseline_output), str(final_output))
 
         encode_secs = time.perf_counter() - t2
         print(f"      Muxed in {encode_secs:.1f}s")
@@ -1316,7 +1390,9 @@ if __name__ == "__main__":
         batch_main(
             batch_size=args.batch_size,
             step_3_enabled=not args.off_step_3,
+            intro_overlay_enabled=not args.no_intro_overlay,
         )
     except (FileNotFoundError, RuntimeError) as exc:
         print(f"\n[ERROR] {exc}", file=sys.stderr)
         sys.exit(1)
+

@@ -99,20 +99,10 @@ def _archive_batch_files(
 
 def _parse_batch_args() -> argparse.Namespace:
     """Parse command-line options for the batch video workflow."""
-    parser = argparse.ArgumentParser(
-        description="Batch-process all input videos with audio from gradio_outputs."
-    )
-    parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=BATCH_SIZE,
-        help=f"Number of audio files per video (default: {BATCH_SIZE}).",
-    )
-    parser.add_argument(
-        "--off-step-3",
-        action="store_true",
-        help="Skip step 3: visible-mark and SynthID cleanup.",
-    )
+    parser = argparse.ArgumentParser(description="Batch-process all input videos with audio from gradio_outputs.")
+    parser.add_argument("--batch-size", type=int, default=BATCH_SIZE, help=f"Number of audio files per video (default: {BATCH_SIZE}).")
+    parser.add_argument("--off-step-3", action="store_true", help="Skip step 3: visible-mark and SynthID cleanup.")
+    parser.add_argument("--no-intro-overlay", action="store_true", help="Skip baking in typewriter intro quote overlay.")
     return parser.parse_args()
 
 
@@ -120,6 +110,7 @@ def batch_main(
     *,
     batch_size: int = BATCH_SIZE,
     step_3_enabled: bool = True,
+    intro_overlay_enabled: bool = True,
     input_dir: Path = INPUT_DIR,
     gradio_outputs_dir: Path = GRADIO_OUTPUTS_DIR,
     archive_dir: Path = ARCHIVE_DIR,
@@ -168,6 +159,7 @@ def batch_main(
             main(
                 step_3_enabled=step_3_enabled,
                 archive_enabled=False,
+                intro_overlay_enabled=intro_overlay_enabled,
                 input_video=video,
                 mp3_files=batch_audio,
                 output_dir=batch_dir,
@@ -196,4 +188,9 @@ def batch_main(
 
 if __name__ == "__main__":
     args = _parse_batch_args()
-    batch_main(batch_size=args.batch_size, step_3_enabled=not args.off_step_3)
+    batch_main(
+        batch_size=args.batch_size,
+        step_3_enabled=not args.off_step_3,
+        intro_overlay_enabled=not args.no_intro_overlay,
+    )
+
