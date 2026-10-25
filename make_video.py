@@ -469,7 +469,7 @@ def _concat_audio(
         list_file = out_dir / "audio_list.txt"
         with list_file.open("w", encoding="utf-8") as fh:
             for f in mp3_files:
-                safe = str(f.resolve()).replace("\\", "/")
+                safe = str(f.resolve()).replace("\\", "/").replace("'", "'\\''")
                 fh.write(f"file '{safe}'\n")
 
         cmd = [
@@ -506,7 +506,7 @@ def _concat_audio(
         list_file = out_dir / "audio_chunks_list.txt"
         with list_file.open("w", encoding="utf-8") as fh:
             for chunk in chunk_paths:
-                safe = str(chunk.resolve()).replace("\\", "/")
+                safe = str(chunk.resolve()).replace("\\", "/").replace("'", "'\\''")
                 fh.write(f"file '{safe}'\n")
 
         cmd = [
@@ -744,12 +744,14 @@ def _upscale_video_to_1080p(
     target_w, target_h = (1080, 1920) if is_portrait else (1920, 1080)
 
     if width >= target_w and height >= target_h:
-        print(f"      Source video is already {width}x{height} (>= 1080p) -- skipping upscale.")
-        return video_path
-
-    print(f"      Upscaling video: {width}x{height} -> {target_w}x{target_h} (1080p)...")
-
-    vf = _build_cover_scale_filter(target_w, target_h)
+        # Already >= 1080p: keep resolution, but still re-encode into a loop-safe stream
+        # (closed GOP, no B-frames). Stream-copy looping a clip with B-frames/long GOPs
+        # produces decoding glitches at every loop point.
+        print(f"      Source video is already {width}x{height} (>= 1080p) -- normalising for seamless looping...")
+        vf = "setsar=1"
+    else:
+        print(f"      Upscaling video: {width}x{height} -> {target_w}x{target_h} (1080p)...")
+        vf = _build_cover_scale_filter(target_w, target_h)
 
     is_nvenc = "nvenc" in encoder
     cmd = [
@@ -1332,32 +1334,34 @@ def main(
             desc="      Video stream copy & mux",
         )
 
-        if intro_overlay_enabled and metadata:
-            print("      Applying typewriter intro text overlay...")
-            try:
-                from intro_quote_renderer import TypewriterConfig, build_lines_layout
-                from add_intro_quote_overlay import splice_video_with_intro
-
-                tw_config = TypewriterConfig(total_duration=20.0, anim_duration=2.5)
-                layout = build_lines_layout(
-                    text1="Hi my friend...",
-                    greeting=metadata.greeting,
-                    quote=metadata.quote,
-                    config=tw_config,
-                )
-                splice_video_with_intro(
-                    video_path=baseline_output,
-                    out_path=final_output,
-                    layout=layout,
-                    config=tw_config,
-                    split_seconds=24.0,
-                )
-            except Exception as exc:
-                print(f"      [WARN] Intro overlay failed ({exc}). Using baseline video.")
-                if baseline_output.exists():
-                    shutil.move(str(baseline_output), str(final_output))
-        else:
-            shutil.move(str(baseline_output), str(final_output))
+        # Intro text overlay step (temporarily commented out)
+        # if intro_overlay_enabled and metadata:
+        #     print("      Applying typewriter intro text overlay...")
+        #     try:
+        #         from intro_quote_renderer import TypewriterConfig, build_lines_layout
+        #         from add_intro_quote_overlay import splice_video_with_intro
+        #
+        #         tw_config = TypewriterConfig(total_duration=20.0, anim_duration=2.5)
+        #         layout = build_lines_layout(
+        #             text1="Hi my friend...",
+        #             greeting=metadata.greeting,
+        #             quote=metadata.quote,
+        #             config=tw_config,
+        #         )
+        #         splice_video_with_intro(
+        #             video_path=baseline_output,
+        #             out_path=final_output,
+        #             layout=layout,
+        #             config=tw_config,
+        #             split_seconds=24.0,
+        #         )
+        #     except Exception as exc:
+        #         print(f"      [WARN] Intro overlay failed ({exc}). Using baseline video.")
+        #         if baseline_output.exists():
+        #             shutil.move(str(baseline_output), str(final_output))
+        # else:
+        #     shutil.move(str(baseline_output), str(final_output))
+        shutil.move(str(baseline_output), str(final_output))
 
         encode_secs = time.perf_counter() - t2
         print(f"      Muxed in {encode_secs:.1f}s")

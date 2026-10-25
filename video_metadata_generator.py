@@ -22,6 +22,10 @@ _FALLBACK_QUOTES = [
     "Silence is a source of great strength",
 ]
 
+DEFAULT_AGY_MODEL = os.environ.get("ACE_STEP_AGY_MODEL", "gemini-3.8-flash-high")
+DEFAULT_AGY_EFFORT = os.environ.get("ACE_STEP_AGY_EFFORT", "high")
+DEFAULT_AGY_TIMEOUT = int(os.environ.get("ACE_STEP_AGY_TIMEOUT", "300"))
+
 
 @dataclass
 class VideoMetadata:
@@ -86,7 +90,7 @@ def generate_offline_metadata(frame_path: Path, song_count: int) -> VideoMetadat
     scene_words = [w.capitalize() for w in stem.split() if len(w) > 3 and w.lower() not in {"unsplash", "batch", "preview"}]
     scene_desc = " ".join(scene_words[:2]) if scene_words else "Cozy Shore"
 
-    title = f"Chill Dog on a {scene_desc} with Lofi Music"
+    title = f"Chill Vibes on a {scene_desc} with Lofi Music"
     greeting = f"Hi my friend, relax and enjoy peaceful moments by the {scene_desc.lower()}."
     quote = _FALLBACK_QUOTES[hash(stem) % len(_FALLBACK_QUOTES)]
 
@@ -106,7 +110,13 @@ def generate_offline_metadata(frame_path: Path, song_count: int) -> VideoMetadat
     return VideoMetadata(title=title, greeting=greeting, quote=quote, song_titles=song_titles)
 
 
-def generate_metadata_via_agy(preview_img: Path, song_count: int) -> VideoMetadata:
+def generate_metadata_via_agy(
+    preview_img: Path,
+    song_count: int,
+    model: str = DEFAULT_AGY_MODEL,
+    effort: str = DEFAULT_AGY_EFFORT,
+    timeout: int = DEFAULT_AGY_TIMEOUT,
+) -> VideoMetadata:
     """Call Antigravity CLI to analyze preview image and return structured metadata."""
     agy_bin = _resolve_agy_binary()
     if not agy_bin:
@@ -115,7 +125,8 @@ def generate_metadata_via_agy(preview_img: Path, song_count: int) -> VideoMetada
     rel_img = preview_img.resolve()
     prompt = (
         f"Analyze the scene in the image @{rel_img}. "
-        "1. Give me a title for this video (smth like 'Chill Dog on a Sunset Beach with Lofi Music'). "
+        "1. Give me a title for this video that names the ACTUAL main subject you see "
+        "(person, animal, or scenery), e.g. 'Chill Girl on a Sunset Beach with Lofi Music'. "
         "2. Write a warm greeting starting with 'Hi my friend, ...'. "
         "3. Provide a short inspirational chill quote. "
         f"4. Generate exactly {song_count} unique, creative chill/lofi song titles. "
@@ -125,10 +136,12 @@ def generate_metadata_via_agy(preview_img: Path, song_count: int) -> VideoMetada
     cmd = [
         str(agy_bin),
         "--dangerously-skip-permissions",
+        "--model", model,
+        "--effort", effort,
         "-p", prompt,
         "--output-format", "text",
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=120)
+    result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=timeout)
     data = extract_json_payload(result.stdout)
     return VideoMetadata(
         title=str(data["title"]),

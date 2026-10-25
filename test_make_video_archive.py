@@ -144,6 +144,7 @@ class TestArchiveSources(unittest.TestCase):
         self.assertIsNone(archived_video)
         self.assertEqual(archived_batches, [])
 
+    @patch("make_video.generate_video_metadata")
     @patch("make_video.archive_sources")
     @patch("make_video._run_ffmpeg_with_progress")
     @patch("make_video._remux_to_ts")
@@ -168,8 +169,16 @@ class TestArchiveSources(unittest.TestCase):
         mock_remux: MagicMock,
         mock_run_ffmpeg: MagicMock,
         mock_archive: MagicMock,
+        mock_metadata: MagicMock,
     ) -> None:
         """Verify main() respects the archive_enabled flag."""
+        from video_metadata_generator import VideoMetadata
+        mock_metadata.return_value = VideoMetadata(
+            title="Test Video",
+            greeting="Hi friend",
+            quote="Peace",
+            song_titles=["Test Song"],
+        )
         fake_video = self.input_dir / "input.mp4"
         fake_video.write_bytes(b"video")
         fake_mp3 = self.gradio_dir / "batch_1" / "track.mp3"

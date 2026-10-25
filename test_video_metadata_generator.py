@@ -105,7 +105,8 @@ class TestGenerateOfflineMetadata(unittest.TestCase):
     def test_generates_exact_count_of_unique_song_titles(self) -> None:
         p = Path("cristofer-beach-scene.jpg")
         meta = generate_offline_metadata(p, song_count=25)
-        self.assertIn("Chill Dog", meta.title)
+        self.assertIn("Chill Vibes", meta.title)
+        self.assertNotIn("Dog", meta.title)
         self.assertTrue(meta.greeting.startswith("Hi my friend"))
         self.assertTrue(len(meta.quote) > 5)
         self.assertEqual(len(meta.song_titles), 25)
@@ -130,6 +131,10 @@ class TestGenerateMetadataViaAgy(unittest.TestCase):
         prompt_arg = cmd[cmd.index("-p") + 1]
         self.assertIn(str(img_p.resolve()), prompt_arg)
         self.assertIn("--dangerously-skip-permissions", cmd)
+        self.assertIn("--model", cmd)
+        self.assertEqual(cmd[cmd.index("--model") + 1], "gemini-3.8-flash-high")
+        self.assertIn("--effort", cmd)
+        self.assertEqual(cmd[cmd.index("--effort") + 1], "high")
         self.assertIn("--output-format", cmd)
         self.assertEqual(meta.title, "Beach Lofi")
         self.assertEqual(meta.song_titles, ["T1", "T2"])
