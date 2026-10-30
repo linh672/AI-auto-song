@@ -95,3 +95,11 @@ A seamless, subtle looping animation. The cute black puppy rests quietly on the 
 check all the timeline in archive folder give me a title for that video (take the screenshot of input video to understand the visual and that video's title will go with smth like chill dog with Lofi Music)  put it in the first line of each timeline.txt file  and change all the titles for each song in each timeline (make the name unique and related to chill music)
 also change the 1...final.mp4 name file to the name of that video
 check all the timeline in archive folder to add more first quote at the between title of the video and first timeline song
+
+
+
+
+change the pose of the girl
+change the weather to sunset
+make this more appealing
+give me prompt to animate the girl in the picture
