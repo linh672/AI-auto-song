@@ -103,3 +103,14 @@ change the pose of the girl
 change the weather to sunset
 make this more appealing
 give me prompt to animate the girl in the picture
+
+
+
+
+
+change the pose of the girl
+change the weather to sunset
+
+make this more appealing
+
+animate the girl 
