@@ -113,4 +113,4 @@ change the weather to sunset
 
 make this more appealing
 
-animate the girl 
+animate the girl as a continuous loop
