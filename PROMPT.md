@@ -108,8 +108,8 @@ give me prompt to animate the girl in the picture
 
 
 
-change the pose of the girl
-change the weather to sunset
+change the color of the hair of the girl
+change the weather to midnight and and make it deeply emotional 
 
 make this more appealing
 
