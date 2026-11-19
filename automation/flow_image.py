@@ -20,6 +20,25 @@ from automation.config import (
 from automation.flow_utils import dismiss_popups, submit_generation, wait_for_generation
 
 
+def _wait_for_asset_upload_ready(page: Page, filename: str, timeout_s: int = 60) -> None:
+    """Wait until an uploaded asset finishes uploading and is selectable in the panel.
+
+    Args:
+        page: The active Playwright page.
+        filename: Uploaded image filename to wait for.
+        timeout_s: Maximum seconds to wait for upload completion.
+    """
+    for _ in range(timeout_s):
+        panel = page.locator(".cdk-overlay-pane").last
+        asset_option = panel.locator(f'[role="option"]:has-text("{filename}")').first
+        if asset_option.count() > 0:
+            opt_text = asset_option.inner_text()
+            if "Uploading" not in opt_text and "Đang tải lên" not in opt_text:
+                return
+        page.wait_for_timeout(1000)
+    logger.warning("Timed out waiting for '{}' upload spinner to finish.", filename)
+
+
 def _upload_if_needed(page: Page, image_path: Path) -> None:
     """Upload an image to Google Flow if it is not already in the asset list.
 
@@ -33,6 +52,7 @@ def _upload_if_needed(page: Page, image_path: Path) -> None:
     )
     if asset_option.count() > 0:
         logger.info("Asset '{}' already uploaded.", filename)
+        _wait_for_asset_upload_ready(page, filename)
         return
 
     logger.info("Uploading '{}' to Google Flow...", filename)
@@ -42,65 +62,78 @@ def _upload_if_needed(page: Page, image_path: Path) -> None:
         upload_btn.click()
     file_chooser = fc_info.value
     file_chooser.set_files(str(image_path))
-    page.wait_for_timeout(3000)  # wait for upload to complete
+    _wait_for_asset_upload_ready(page, filename)
     logger.info("Upload complete: {}", filename)
 
 
 def _add_single_asset(page: Page, asset_name: str) -> None:
-    """Select one asset from the ingredient panel and add it to the prompt.
+    """Select one asset from the ingredient panel and attach it to the prompt box.
 
-    Google Flow's asset panel is single-select, so we must add assets
-    one at a time: open panel → select → add to prompt → panel closes.
+    Ensures the uploaded asset is finished uploading, selects it if not already
+    marked with ``asset-item-active``, clicks ``Add to prompt`` when enabled,
+    and verifies the ingredient chip is attached to the prompt box.
 
     Args:
         page: The active Playwright page.
         asset_name: Display name (filename) of the asset to add.
     """
-    # Open the ingredients panel
-    page.locator(UI_SELECTORS["add_ingredients_btn"]).click()
-    page.wait_for_timeout(1000)
+    ingredient_panel = page.locator(".cdk-overlay-pane").last
+    if not ingredient_panel.is_visible():
+        page.locator(UI_SELECTORS["add_ingredients_btn"]).click()
+        page.wait_for_timeout(1000)
+        ingredient_panel = page.locator(".cdk-overlay-pane").last
+        ingredient_panel.wait_for(state="visible", timeout=3000)
 
-    # Find the active ingredient panel overlay
-    ingredient_panel = page.locator('.cdk-overlay-pane').last
-    ingredient_panel.wait_for(state="visible", timeout=3000)
+        uploads_tab = ingredient_panel.locator(UI_SELECTORS["asset_tab_uploads"]).first
+        if uploads_tab.is_visible(timeout=2000):
+            try:
+                uploads_tab.click()
+                page.wait_for_timeout(1000)
+            except Exception as e:
+                logger.warning(f"Failed to click Uploads tab: {e}")
 
-    # Switch to Uploads tab
-    uploads_tab = ingredient_panel.locator(UI_SELECTORS["asset_tab_uploads"]).first
-    if uploads_tab.is_visible(timeout=2000):
-        try:
-            uploads_tab.click(force=True)
-            page.wait_for_timeout(1000)
-        except Exception as e:
-            logger.warning(f"Failed to click Uploads tab: {e}")
-    else:
-        logger.warning("Could not find Uploads tab in ingredient panel!")
+    _wait_for_asset_upload_ready(page, asset_name)
 
-    # Select the asset (force click to avoid Angular Material tooltip interceptions)
     asset_option = ingredient_panel.locator(
         f'[role="option"]:has-text("{asset_name}")'
     ).first
+    add_btn = ingredient_panel.locator(UI_SELECTORS["add_to_prompt_btn"]).first
+
     try:
         asset_option.scroll_into_view_if_needed()
-        asset_option.click(force=True)
-        page.wait_for_timeout(1000)
+        opt_class = asset_option.get_attribute("class") or ""
+        if "asset-item-active" not in opt_class or add_btn.get_attribute("disabled") is not None:
+            asset_option.click()
+            page.wait_for_timeout(800)
     except Exception as e:
-        logger.warning(f"Failed to click asset {asset_name}: {e}")
+        logger.warning(f"Failed to select asset {asset_name}: {e}")
 
-    # Click "Add to prompt" if still visible (panel may auto-close)
-    add_btn = ingredient_panel.locator(UI_SELECTORS["add_to_prompt_btn"])
-    if add_btn.is_visible(timeout=2000):
+    # Wait for "Add to prompt" button to become enabled, then click it
+    if add_btn.is_visible(timeout=3000):
+        for _ in range(15):
+            if add_btn.get_attribute("disabled") is None:
+                break
+            page.wait_for_timeout(500)
         try:
-            add_btn.click(force=True)
+            add_btn.click()
             page.wait_for_timeout(1000)
         except Exception as e:
             logger.warning(f"Failed to click Add to Prompt: {e}")
 
-    # Ensure panel is closed for the next asset
-    try:
-        page.keyboard.press("Escape")
-        page.wait_for_timeout(500)
-    except:
-        pass
+    # Verify the image ingredient chip is attached in the prompt box
+    chip = page.locator('flow-image-ingredient-chip img[alt="Ingredient image"], flow-ingredient-chip')
+    if chip.count() > 0:
+        logger.info("Verified ingredient chip attached for: {}", asset_name)
+    else:
+        logger.warning("Ingredient chip not detected after first attempt for {}", asset_name)
+
+    # Ensure panel is closed if still open
+    if ingredient_panel.is_visible():
+        try:
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(500)
+        except Exception:
+            pass
 
     logger.info("Added asset to prompt: {}", asset_name)
 
@@ -173,27 +206,24 @@ def _open_settings_and_configure(page: Page) -> None:
 
 def create_composite_image(
     page: Page,
-    character_path: Path,
+    # character_path: Path,  # Commented out: dog character workflow disabled
     background_path: Path,
 ) -> None:
-    """Create a composite image by combining character + background.
-
-    Assets are added one at a time because Google Flow's ingredient
-    panel is single-select (clicking a second asset deselects the first).
+    """Edit a background image in Google Flow using IMAGE_PROMPT.
 
     Args:
         page: The active Playwright page.
-        character_path: Path to the character (dog) image.
-        background_path: Path to the background image.
+        background_path: Path to the background image to edit.
 
     Raises:
         PlaywrightTimeout: If generation does not complete in time.
     """
-    logger.info(
-        "Creating composite: {} + {}",
-        character_path.name,
-        background_path.name,
-    )
+    # logger.info(
+    #     "Creating composite: {} + {}",
+    #     character_path.name,
+    #     background_path.name,
+    # )
+    logger.info("Editing background image: {}", background_path.name)
 
     page.goto(FLOW_URL)
     
@@ -251,21 +281,20 @@ def create_composite_image(
         uploads_tab.click()
         page.wait_for_timeout(1000)
 
-    _upload_if_needed(page, character_path)
+    # _upload_if_needed(page, character_path)
     _upload_if_needed(page, background_path)
 
-    # Close the panel before adding assets one by one
-    page.keyboard.press("Escape")
-    page.wait_for_timeout(500)
-
-    # Add character image first, then background image
-    _add_single_asset(page, character_path.name)
+    # Attach background image directly from the active panel (dog character image commented out)
+    # _add_single_asset(page, character_path.name)
     _add_single_asset(page, background_path.name)
 
-    # Enter prompt (we already configured settings above)
+    # Enter prompt (using Shift+Enter for multiline prompts to avoid early Enter submit)
     prompt = page.locator(UI_SELECTORS["prompt_paragraph"]).first
     prompt.click()
-    page.keyboard.type(IMAGE_PROMPT, delay=20)
+    for idx, line in enumerate(IMAGE_PROMPT.splitlines()):
+        if idx > 0:
+            page.keyboard.press("Shift+Enter")
+        page.keyboard.type(line, delay=20)
     logger.info("Entered image prompt.")
 
     # Submit

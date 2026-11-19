@@ -102,7 +102,8 @@ def create_video_from_image(page: Page) -> None:
             page.wait_for_timeout(500)
             
         img = panel.locator('[role="option"]').first
-        img.click()
+        if "asset-item-active" not in (img.get_attribute("class") or ""):
+            img.click()
         page.wait_for_timeout(500)
         
         add_btn = panel.locator(UI_SELECTORS["add_to_prompt_btn"])
@@ -127,9 +128,8 @@ def create_video_from_image(page: Page) -> None:
             page.wait_for_timeout(500)
             
         img = panel.locator('[role="option"]').first
-        # In the second pass, sometimes clicking unselects it if state is shared, 
-        # but in Keyframe mode they are separate slots. We check if it's already selected.
-        if img.get_attribute("aria-selected") != "true":
+        # Google Flow marks the active option with 'asset-item-active' in class (aria-selected is always 'false')
+        if "asset-item-active" not in (img.get_attribute("class") or ""):
             img.click()
         page.wait_for_timeout(500)
         

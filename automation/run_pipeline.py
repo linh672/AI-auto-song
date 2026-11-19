@@ -16,7 +16,7 @@ from playwright.sync_api import sync_playwright
 
 from automation.config import (
     BACKGROUND_DIR,
-    CHARACTER_DIR,
+    # CHARACTER_DIR,  # Dog section commented out
     COOLDOWN_BETWEEN_ITERATIONS,
     FLOW_URL,
     IMAGE_EXTENSIONS,
@@ -64,20 +64,20 @@ def _safe_close(ctx) -> None:
     except Exception:
         pass
 
-def _get_character_image() -> Path:
-    """Find the single character image in the character directory.
-
-    Returns:
-        Path to the character image.
-
-    Raises:
-        FileNotFoundError: If no image is found in the character directory.
-    """
-    for f in CHARACTER_DIR.iterdir():
-        if f.suffix.lower() in IMAGE_EXTENSIONS:
-            logger.info("Character image: {}", f.name)
-            return f
-    raise FileNotFoundError(f"No image found in {CHARACTER_DIR}")
+# def _get_character_image() -> Path:
+#     """Find the single character image in the character directory.
+#
+#     Returns:
+#         Path to the character image.
+#
+#     Raises:
+#         FileNotFoundError: If no image is found in the character directory.
+#     """
+#     for f in CHARACTER_DIR.iterdir():
+#         if f.suffix.lower() in IMAGE_EXTENSIONS:
+#             logger.info("Character image: {}", f.name)
+#             return f
+#     raise FileNotFoundError(f"No image found in {CHARACTER_DIR}")
 
 
 def _get_background_images() -> list[Path]:
@@ -131,7 +131,7 @@ def run_pipeline() -> int:
     Returns:
         Exit code: 0 on full success, 1 if any background failed.
     """
-    character = _get_character_image()
+    # character = _get_character_image()
     backgrounds = _get_background_images()
     completed = _get_completed()
 
@@ -170,7 +170,8 @@ def run_pipeline() -> int:
                         accept_downloads=True, downloads_path=str(OUTPUT_DIR)
                     )
                     page = ctx.pages[0] if ctx.pages else ctx.new_page()
-                    create_composite_image(page, character, bg)
+                    # create_composite_image(page, character, bg)
+                    create_composite_image(page, bg)
                     create_video_from_image(page)
                     project_url = page.url
                     _safe_close(ctx)

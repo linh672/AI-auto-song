@@ -14,7 +14,7 @@ from pathlib import Path
 _AUTOMATION_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = _AUTOMATION_DIR.parent
 
-CHARACTER_DIR: Path = _AUTOMATION_DIR / "character"
+# CHARACTER_DIR: Path = _AUTOMATION_DIR / "character"  # Dog section commented out
 BACKGROUND_DIR: Path = _AUTOMATION_DIR / "background"
 GENERATED_IMAGES_DIR: Path = _AUTOMATION_DIR / "generated_images"
 OUTPUT_DIR: Path = _REPO_ROOT / "input"
@@ -28,18 +28,26 @@ FLOW_URL = "https://flow.google.com"
 # ---------------------------------------------------------------------------
 # Prompts
 # ---------------------------------------------------------------------------
+# --- Dog workflow prompts (commented out) ---
+# IMAGE_PROMPT = (
+#     "add the first dog in the first picture into the second picture "
+#     "(the new picture ratio 16:9) and change the pose so the dog is "
+#     "more chill dont add any text"
+# )
+#
+# VIDEO_PROMPT = (
+#     "A seamless, subtle looping animation. The cute black puppy rests "
+#     "quietly on the ground in the meadow, showing only gentle, natural "
+#     "chest breathing and an occasional slow, sleepy blink, keeping its "
+#     "mouth completely still."
+# )
+
 IMAGE_PROMPT = (
-    "add the first dog in the first picture into the second picture "
-    "(the new picture ratio 16:9) and change the pose so the dog is "
-    "more chill dont add any text"
+    "change the color of the hair of the girl\n"
+    "change the weather to midnight and make it deeply emotional"
 )
 
-VIDEO_PROMPT = (
-    "A seamless, subtle looping animation. The cute black puppy rests "
-    "quietly on the ground in the meadow, showing only gentle, natural "
-    "chest breathing and an occasional slow, sleepy blink, keeping its "
-    "mouth completely still."
-)
+VIDEO_PROMPT = "animate the girl as a continuous loop"
 
 # ---------------------------------------------------------------------------
 # Timeouts (seconds unless noted)
