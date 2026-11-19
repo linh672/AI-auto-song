@@ -47,7 +47,10 @@ IMAGE_PROMPT = (
     "change the weather to midnight and make it deeply emotional"
 )
 
-VIDEO_PROMPT = "animate the girl as a continuous loop"
+VIDEO_PROMPT = (
+    "animate the girl as a continuous loop, "
+    "only animate the girl and never animate the background"
+)
 
 # ---------------------------------------------------------------------------
 # Timeouts (seconds unless noted)

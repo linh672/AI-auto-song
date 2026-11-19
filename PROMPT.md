@@ -109,8 +109,8 @@ give me prompt to animate the girl in the picture
 
 
 change the color of the hair of the girl
-change the weather to midnight and and make it deeply emotional 
+change the weather to midnight and make it deeply emotional
 
 make this more appealing
 
-animate the girl as a continuous loop
+animate the girl as a continuous loop, only animate the girl and never animate the background

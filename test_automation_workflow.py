@@ -19,8 +19,12 @@ class TestAutomationWorkflow(unittest.TestCase):
             "change the color of the hair of the girl\n"
             "change the weather to midnight and make it deeply emotional"
         )
+        expected_video_prompt = (
+            "animate the girl as a continuous loop, "
+            "only animate the girl and never animate the background"
+        )
         self.assertEqual(config.IMAGE_PROMPT, expected_image_prompt)
-        self.assertEqual(config.VIDEO_PROMPT, "animate the girl as a continuous loop")
+        self.assertEqual(config.VIDEO_PROMPT, expected_video_prompt)
         self.assertFalse(hasattr(config, "CHARACTER_DIR"))
 
     @patch("automation.flow_image.wait_for_generation")
@@ -110,7 +114,7 @@ class TestAutomationWorkflow(unittest.TestCase):
 
         mock_video_settings.assert_called_once_with(page)
         page.keyboard.type.assert_called_once_with(
-            "animate the girl as a continuous loop",
+            "animate the girl as a continuous loop, only animate the girl and never animate the background",
             delay=20,
         )
         mock_submit.assert_called_once_with(page)
