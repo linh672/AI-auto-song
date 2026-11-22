@@ -79,7 +79,7 @@ ROOT_DIR = Path(__file__).parent.resolve()
 GRADIO_OUTPUTS_DIR = ROOT_DIR / "gradio_outputs"
 INPUT_DIR = ROOT_DIR / "input"
 OUTPUT_DIR = ROOT_DIR / "output"
-ARCHIVE_DIR = ROOT_DIR / "archive"
+ARCHIVE_DIR = Path(r"D:\Archive1")
 
 # i9-14HX: 8 P-cores + 16 E-cores = 24 cores / 32 threads.
 # ffmpeg benefits most from P-core count for decode; keep 16 for encode headroom.

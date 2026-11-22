@@ -8,11 +8,15 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from make_video import _safe_move_to_archive, archive_sources, main
+from make_video import ARCHIVE_DIR, _safe_move_to_archive, archive_sources, main
 
 
 class TestArchiveSources(unittest.TestCase):
     """Test suite for archiving used video inputs and gradio_outputs batch directories."""
+
+    def test_default_archive_dir_is_d_archive1(self) -> None:
+        """Verify ARCHIVE_DIR points to D:\\Archive1 to save workspace drive storage."""
+        self.assertEqual(ARCHIVE_DIR, Path(r"D:\Archive1"))
 
     def setUp(self) -> None:
         """Create an isolated temporary workspace for each test."""

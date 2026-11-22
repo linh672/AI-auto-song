@@ -170,7 +170,7 @@ def process_single_target(
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments for intro quote overlay CLI."""
     p = argparse.ArgumentParser(description="Add typewriter intro text to chill videos.")
-    p.add_argument("--archive-dir", type=Path, default=Path("archive"), help="Archive folder.")
+    p.add_argument("--archive-dir", type=Path, default=Path(r"D:\Archive1"), help="Archive folder.")
     p.add_argument("--batch", type=str, default=None, help="Process only specific batch folder.")
     p.add_argument("--duration", type=float, default=20.0, help="Intro active seconds (20s).")
     p.add_argument("--anim-duration", type=float, default=2.5, help="Typewriter in/out seconds (2.5s).")
