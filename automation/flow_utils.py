@@ -62,16 +62,47 @@ def dismiss_popups(page: Page) -> None:
             logger.debug("Popup check '{}' raised: {}", name, exc)
 
 
+def _check_generation_failure(page: Page) -> str | None:
+    """Return the failure message if a generation tile failed (e.g., usage limit reached).
+
+    Args:
+        page: The active Playwright page.
+
+    Returns:
+        Failure summary string if a failed generation tile is detected, else None.
+    """
+    return page.evaluate('''() => {
+        const bodyText = document.body ? document.body.innerText : '';
+        if (bodyText.includes("You've reached your usage limit") || bodyText.includes("reached your usage limit")) {
+            return "You've reached your usage limit.";
+        }
+        if (bodyText.includes("You have not been charged for this generation")) {
+            return "Generation failed on Google Flow (not charged).";
+        }
+        const headings = document.querySelectorAll('div, span, p, h1, h2, h3, h4');
+        for (const el of headings) {
+            const t = (el.textContent || '').trim();
+            if (t === 'Failed' || t === 'Không thành công') {
+                return `Generation tile reported: ${t}`;
+            }
+        }
+        return null;
+    }''')
+
+
 def wait_for_generation(page: Page, timeout_ms: int) -> None:
     """Wait for new content to appear after submitting a generation.
 
-    Waits for the progress percentage (e.g. 7%, 28%) to appear and then disappear.
+    Waits for the progress percentage (e.g. 7%, 28%) to appear and then disappear,
+    and verifies that generation did not end in a Failed / usage-limit tile.
 
     Args:
         page: The active Playwright page.
         timeout_ms: Maximum wait time in milliseconds.
 
     Raises:
+        InsufficientCreditsError: If the account reached its usage limit.
+        RuntimeError: If Google Flow reported a failed generation tile.
         PlaywrightTimeout: If no result appears within timeout.
     """
     logger.info("Waiting for generation result (timeout {}s)...", timeout_ms // 1000)
@@ -83,6 +114,12 @@ def wait_for_generation(page: Page, timeout_ms: int) -> None:
     logger.info("Waiting for progress indicator to appear...")
     appeared = False
     while time.time() - start_time < 30:
+        failure = _check_generation_failure(page)
+        if failure:
+            if "usage limit" in failure.lower():
+                raise InsufficientCreditsError(failure)
+            raise RuntimeError(failure)
+
         progress_visible = page.evaluate('''() => {
             const tiles = document.querySelectorAll('*');
             for (let tile of tiles) {
@@ -99,11 +136,17 @@ def wait_for_generation(page: Page, timeout_ms: int) -> None:
         page.wait_for_timeout(1000)
         
     if not appeared:
-        logger.warning("No progress indicator appeared within 30s. Assuming it either finished instantly or failed.")
+        logger.warning("No progress indicator appeared within 30s. Checking for failure state...")
         
     # Now, wait for it to DISAPPEAR
     logger.info("Waiting for generation to finish...")
     while time.time() - start_time < timeout_ms / 1000:
+        failure = _check_generation_failure(page)
+        if failure:
+            if "usage limit" in failure.lower():
+                raise InsufficientCreditsError(failure)
+            raise RuntimeError(failure)
+
         progress_visible = page.evaluate('''() => {
             const tiles = document.querySelectorAll('*');
             for (let tile of tiles) {
@@ -115,11 +158,16 @@ def wait_for_generation(page: Page, timeout_ms: int) -> None:
         }''')
         
         if not progress_visible:
-            logger.info("No active progress indicators found. Generation complete.")
             page.wait_for_timeout(2000)
+            failure = _check_generation_failure(page)
+            if failure:
+                if "usage limit" in failure.lower():
+                    raise InsufficientCreditsError(failure)
+                raise RuntimeError(failure)
+            logger.info("No active progress indicators found. Generation complete.")
             return
             
         page.wait_for_timeout(3000)
         logger.info("Still generating...")
         
-    logger.warning("Generation wait timed out! Proceeding anyway.")
+    raise RuntimeError("Generation wait timed out!")

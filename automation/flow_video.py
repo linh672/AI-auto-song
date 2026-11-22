@@ -81,7 +81,7 @@ def create_video_from_image(page: Page) -> None:
 
     # Start fresh to clear previous prompts
     page.reload()
-    page.locator(UI_SELECTORS["add_ingredients_btn"]).wait_for(state="visible", timeout=30000)
+    page.locator(UI_SELECTORS["prompt_paragraph"]).first.wait_for(state="visible", timeout=30000)
     dismiss_popups(page)
 
     # Configure settings FIRST so the prompt box switches to Keyframe mode
@@ -100,8 +100,14 @@ def create_video_from_image(page: Page) -> None:
         if img_tab.is_visible():
             img_tab.click()
             page.wait_for_timeout(500)
-            
-        img = panel.locator('[role="option"]').first
+
+        options = panel.locator('[role="option"]')
+        if options.count() < 2:
+            raise RuntimeError(
+                "Stage 1 edited image missing in Images tab (found < 2 images); "
+                "refusing to animate raw portrait upload."
+            )
+        img = options.first
         if "asset-item-active" not in (img.get_attribute("class") or ""):
             img.click()
         page.wait_for_timeout(500)

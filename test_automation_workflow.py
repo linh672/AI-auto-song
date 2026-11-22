@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, call, patch
 
 import automation.config as config
 from automation.flow_image import _add_single_asset, _wait_for_asset_upload_ready, create_composite_image
+from automation.flow_utils import InsufficientCreditsError, wait_for_generation
 from automation.flow_video import create_video_from_image
 from automation.run_pipeline import run_pipeline
 
@@ -107,8 +108,12 @@ class TestAutomationWorkflow(unittest.TestCase):
         mock_submit: MagicMock,
         mock_wait: MagicMock,
     ) -> None:
-        """Verify Stage 2 configures video keyframes and types the continuous loop VIDEO_PROMPT."""
+        """Verify Stage 2 configures video keyframes, guards against missing Stage 1 image, and types VIDEO_PROMPT."""
         page = MagicMock()
+        panel = page.locator.return_value.last
+        options = panel.locator.return_value
+        options.count.return_value = 2
+        options.first.get_attribute.return_value = "asset-item asset-item-active"
 
         create_video_from_image(page)
 
@@ -119,6 +124,18 @@ class TestAutomationWorkflow(unittest.TestCase):
         )
         mock_submit.assert_called_once_with(page)
         mock_wait.assert_called_once()
+
+        # Regression check: if Stage 1 failed and only 1 raw uploaded portrait image exists, raise RuntimeError
+        options.count.return_value = 1
+        with self.assertRaises(RuntimeError):
+            create_video_from_image(page)
+
+    def test_wait_for_generation_raises_on_usage_limit_failure(self) -> None:
+        """Verify wait_for_generation raises InsufficientCreditsError when usage limit tile is rendered."""
+        page = MagicMock()
+        page.evaluate.return_value = "You've reached your usage limit."
+        with self.assertRaises(InsufficientCreditsError):
+            wait_for_generation(page, timeout_ms=5000)
 
     @patch("automation.run_pipeline.download_video")
     @patch("automation.run_pipeline.create_video_from_image")

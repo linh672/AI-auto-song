@@ -102,7 +102,7 @@ def _add_single_asset(page: Page, asset_name: str) -> None:
     try:
         asset_option.scroll_into_view_if_needed()
         opt_class = asset_option.get_attribute("class") or ""
-        if "asset-item-active" not in opt_class or add_btn.get_attribute("disabled") is not None:
+        if "asset-item-active" not in opt_class:
             asset_option.click()
             page.wait_for_timeout(800)
     except Exception as e:
@@ -110,7 +110,7 @@ def _add_single_asset(page: Page, asset_name: str) -> None:
 
     # Wait for "Add to prompt" button to become enabled, then click it
     if add_btn.is_visible(timeout=3000):
-        for _ in range(15):
+        for _ in range(20):
             if add_btn.get_attribute("disabled") is None:
                 break
             page.wait_for_timeout(500)
@@ -120,13 +120,6 @@ def _add_single_asset(page: Page, asset_name: str) -> None:
         except Exception as e:
             logger.warning(f"Failed to click Add to Prompt: {e}")
 
-    # Verify the image ingredient chip is attached in the prompt box
-    chip = page.locator('flow-image-ingredient-chip img[alt="Ingredient image"], flow-ingredient-chip')
-    if chip.count() > 0:
-        logger.info("Verified ingredient chip attached for: {}", asset_name)
-    else:
-        logger.warning("Ingredient chip not detected after first attempt for {}", asset_name)
-
     # Ensure panel is closed if still open
     if ingredient_panel.is_visible():
         try:
@@ -134,6 +127,13 @@ def _add_single_asset(page: Page, asset_name: str) -> None:
             page.wait_for_timeout(500)
         except Exception:
             pass
+
+    # Verify the image ingredient chip is attached in the prompt box
+    chip = page.locator('flow-image-ingredient-chip img[alt="Ingredient image"], flow-ingredient-chip')
+    if chip.count() > 0:
+        logger.info("Verified ingredient chip attached for: {}", asset_name)
+    else:
+        raise RuntimeError(f"Ingredient chip was not attached to prompt for {asset_name}")
 
     logger.info("Added asset to prompt: {}", asset_name)
 
@@ -160,8 +160,8 @@ def _open_settings_and_configure(page: Page) -> None:
     # Select Image tab in settings
     image_tab = popover.locator(UI_SELECTORS["settings_image_tab"]).first
     if image_tab.is_visible(timeout=2000):
-        image_tab.click()
-        page.wait_for_timeout(500)
+        image_tab.click(force=True)
+        page.wait_for_timeout(800)
     else:
         logger.warning("Could not find Image tab in settings panel! Check selector.")
 

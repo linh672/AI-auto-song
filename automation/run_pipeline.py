@@ -160,6 +160,7 @@ def run_pipeline() -> int:
             logger.info("Attempting with profile: {}", profile)
             try:
                 _kill_chrome()
+                time.sleep(2)
 
                 # Phase 1: Generate image + video
                 with sync_playwright() as pw:
