@@ -34,6 +34,9 @@ PROFILES = [
     r"C:\FlowBotProfile",
     r"C:\FlowBotProfile_Account2",
     r"C:\FlowBotProfile_Account3",
+    r"C:\FlowBotProfile_Account4",
+    r"C:\FlowBotProfile_Account5",
+    r"C:\FlowBotProfile_Account6",
 ]
 CHROME_ARGS = [
     "--disable-blink-features=AutomationControlled",

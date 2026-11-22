@@ -8,7 +8,7 @@ import automation.config as config
 from automation.flow_image import _add_single_asset, _wait_for_asset_upload_ready, create_composite_image
 from automation.flow_utils import InsufficientCreditsError, wait_for_generation
 from automation.flow_video import create_video_from_image
-from automation.run_pipeline import run_pipeline
+from automation.run_pipeline import PROFILES, run_pipeline
 
 
 class TestAutomationWorkflow(unittest.TestCase):
@@ -27,6 +27,17 @@ class TestAutomationWorkflow(unittest.TestCase):
         self.assertEqual(config.IMAGE_PROMPT, expected_image_prompt)
         self.assertEqual(config.VIDEO_PROMPT, expected_video_prompt)
         self.assertFalse(hasattr(config, "CHARACTER_DIR"))
+        self.assertEqual(
+            PROFILES,
+            [
+                r"C:\FlowBotProfile",
+                r"C:\FlowBotProfile_Account2",
+                r"C:\FlowBotProfile_Account3",
+                r"C:\FlowBotProfile_Account4",
+                r"C:\FlowBotProfile_Account5",
+                r"C:\FlowBotProfile_Account6",
+            ],
+        )
 
     @patch("automation.flow_image.wait_for_generation")
     @patch("automation.flow_image.submit_generation")
